@@ -56,6 +56,15 @@ NULL
   "valid_skip", "other_missing", "blank"
 )
 
+# The 2016 EAVS writes sentinels as "CODE: Label" (e.g.
+# "-999999: Data Not Available"). Reduce such a value to its numeric code so
+# the shared sentinel logic can handle it. Plain values pass through unchanged.
+strip_code_label <- function(x) {
+  m <- !is.na(x) & grepl("^\\s*-?[0-9]+\\s*:", x)
+  x[m] <- sub("^\\s*(-?[0-9]+)\\s*:.*$", "\\1", x[m])
+  x
+}
+
 # Compute the SHA-256 of a file on disk.
 file_sha256 <- function(path) {
   digest::digest(path, algo = "sha256", file = TRUE)

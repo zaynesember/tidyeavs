@@ -23,8 +23,6 @@ Imports:
     readr,
     rlang,
     tibble,
-    tidyr,
-    tidyselect,
     tools
 Suggests:
     haven,

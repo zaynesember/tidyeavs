@@ -58,10 +58,26 @@ read_raw_csv <- function(path) {
   readr::read_csv(
     path,
     col_types = readr::cols(.default = readr::col_character()),
+    locale = readr::locale(encoding = file_encoding(path)),
     show_col_types = FALSE,
     name_repair = "minimal",
     progress = FALSE
   )
+}
+
+# EAVS CSVs are usually Windows-1252 (Excel/SPSS exports), which breaks a
+# UTF-8 read on place names like "Doña Ana". Detect the encoding: use
+# UTF-8 if the bytes are valid UTF-8, otherwise fall back to Windows-1252.
+file_encoding <- function(path) {
+  s <- tryCatch(
+    {
+      x <- rawToChar(readBin(path, "raw", n = file.info(path)$size))
+      Encoding(x) <- "UTF-8"
+      x
+    },
+    error = function(e) NULL
+  )
+  if (is.null(s) || !validUTF8(s)) "Windows-1252" else "UTF-8"
 }
 
 read_raw_xlsx <- function(path, sheet = 1) {

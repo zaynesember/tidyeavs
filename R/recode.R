@@ -90,7 +90,7 @@ item_column <- function(x, name) {
   if (!is.character(x)) {
     return(FALSE)
   }
-  trimmed <- trimws(x)
+  trimmed <- trimws(strip_code_label(x))
   keep <- !is.na(x) & trimmed != "" &
     !(tolower(trimmed) %in% names(.eavs_token_status))
   if (!any(keep)) {
@@ -101,6 +101,7 @@ item_column <- function(x, name) {
 
 # Turn a character item column into numeric values and matching status labels.
 classify_values <- function(x) {
+  x <- strip_code_label(x)
   n <- length(x)
   status <- rep("reported", n)
   value <- rep(NA_real_, n)

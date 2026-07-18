@@ -14,6 +14,18 @@ test_that("modern sentinels map to NA with the right status", {
   expect_equal(as.character(s$y), c("does_not_apply", "valid_skip"))
 })
 
+test_that("2016-style labeled sentinels are decoded", {
+  # 2016 writes sentinels as "CODE: Label" rather than a bare number.
+  df <- tibble::tibble(
+    A1a = c("587303", "-888888: Not Applicable", "-999999: Data Not Available")
+  )
+  expect_equal(eavs_recode_missing(df)$A1a, c(587303, NA, NA))
+  expect_equal(
+    as.character(eavs_missing_status(df)$A1a),
+    c("reported", "does_not_apply", "not_available")
+  )
+})
+
 test_that("six-digit-era sentinels are handled", {
   df <- tibble::tibble(a = c("5", "-888888", "-999999"))
   expect_equal(eavs_recode_missing(df)$a, c(5, NA, NA))

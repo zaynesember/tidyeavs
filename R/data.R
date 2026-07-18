@@ -26,3 +26,38 @@
 #' @source U.S. Election Assistance Commission,
 #'   <https://www.eac.gov/research-and-data/datasets-codebooks-and-surveys>
 "eavs_manifest"
+
+#' Cross-year EAVS variable dictionary
+#'
+#' Maps each survey year's raw variable codes to stable concept names, so that
+#' the same measure can be found in every year despite the EAC's renumbering.
+#' This is the crosswalk that [eavs_harmonize()] and [eavs_load()] use, and it
+#' is searchable with [eavs_items()].
+#'
+#' The dictionary is curated: it covers the concepts most used in EAVS
+#' analysis (registration, mail and UOCAVA ballots, provisional ballots,
+#' participation, polling places, and newer items such as drop boxes), not
+#' every one of the survey's ~400 columns. A concept's `code` is `NA` in years
+#' when the item was not collected, and `note` records renumbering, wording
+#' changes, and breaks worth knowing about—most importantly the cases where the
+#' same code letter means different things in different years.
+#'
+#' @format A tibble with one row per concept per year and the columns:
+#' \describe{
+#'   \item{concept}{Stable snake_case concept name, e.g. `"mail_rejected"`.}
+#'   \item{concept_label}{Plain-language description of the concept.}
+#'   \item{section}{Survey section: `"A"`–`"F"`, or `"id"` for identifiers.}
+#'   \item{year}{Survey year.}
+#'   \item{code}{The raw EAVS variable name that year, or `NA` if not collected.}
+#'   \item{codebook_label}{The label the EAC's codebook gives that variable
+#'     that year, kept as provenance for the mapping.}
+#'   \item{epi_name}{The MIT Elections Performance Index's name for the
+#'     concept, where one exists, or `NA`.}
+#'   \item{note}{Caveats: renumbering, wording changes, and hard breaks.}
+#'   \item{confidence}{How sure the mapping is: `"high"`, `"medium"`, or
+#'     `"low"`. Lower confidence usually reflects a wording or definition
+#'     change worth reading the `note` about.}
+#' }
+#' @source Built from EAC codebooks (2016–2024) and the MIT Elections
+#'   Performance Index variable maps. See `data-raw/dictionary.R`.
+"eavs_dictionary"
