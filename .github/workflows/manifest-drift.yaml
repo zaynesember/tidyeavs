@@ -1,0 +1,28 @@
+# Weekly check that the files published at eac.gov (and the mirror, once one
+# exists) still match the checksums pinned in eavs_manifest. The EAC
+# re-releases revised versions of a cycle for years after the first release;
+# a failure here is the signal to update data-raw/manifest.R and rebuild.
+name: manifest-drift
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'  # Mondays 12:00 UTC
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install dependencies
+        run: Rscript -e 'install.packages(c("curl", "digest"))'
+
+      - name: Check manifest checksums
+        run: Rscript data-raw/check_manifest.R
