@@ -53,8 +53,9 @@ eavs_cache_list <- function() {
   }
   files <- list.files(dir, full.names = TRUE, recursive = TRUE)
   info <- file.info(files)
+  prefix <- paste0(dir, .Platform$file.sep)
   tibble::tibble(
-    file = sub(paste0("^", dir, .Platform$file.sep), "", files),
+    file = sub(prefix, "", files, fixed = TRUE),
     bytes = info$size,
     modified = info$mtime
   )

@@ -55,10 +55,14 @@ read_raw_csv <- function(path) {
   if (identical(tolower(tools::file_ext(path)), "zip")) {
     path <- unzip_member(path, "\\.csv$")
   }
+  # Read the file once and reuse the bytes for both encoding detection and
+  # parsing: readr::read_csv() accepts a raw vector as its input, so there is
+  # no need to read the file a second time from disk.
+  bytes <- readBin(path, "raw", n = file.info(path)$size)
   readr::read_csv(
-    path,
+    bytes,
     col_types = readr::cols(.default = readr::col_character()),
-    locale = readr::locale(encoding = file_encoding(path)),
+    locale = readr::locale(encoding = bytes_encoding(bytes)),
     show_col_types = FALSE,
     name_repair = "minimal",
     progress = FALSE
@@ -66,12 +70,13 @@ read_raw_csv <- function(path) {
 }
 
 # EAVS CSVs are usually Windows-1252 (Excel/SPSS exports), which breaks a
-# UTF-8 read on place names like "Doña Ana". Detect the encoding: use
-# UTF-8 if the bytes are valid UTF-8, otherwise fall back to Windows-1252.
-file_encoding <- function(path) {
+# UTF-8 read on place names like "Doña Ana". Detect the encoding from the
+# file's bytes: use UTF-8 if they are valid UTF-8, otherwise fall back to
+# Windows-1252.
+bytes_encoding <- function(bytes) {
   s <- tryCatch(
     {
-      x <- rawToChar(readBin(path, "raw", n = file.info(path)$size))
+      x <- rawToChar(bytes)
       Encoding(x) <- "UTF-8"
       x
     },

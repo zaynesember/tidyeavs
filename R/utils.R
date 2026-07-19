@@ -1,6 +1,3 @@
-#' @importFrom rlang %||%
-NULL
-
 # Sentinel and missing-value handling ------------------------------------
 
 # EAVS marks non-substantive responses with negative integer sentinels. The

@@ -23,8 +23,8 @@ The package does three things:
   verified against a checksum so you get the exact version you expect.
 - **Decodes** the survey's missing-value codes, keeping "does not apply"
   distinct from "data not available" rather than collapsing both to `NA`.
-- **Harmonizes** variable names across years, so that mail ballots rejected —
-  `C4a` in 2020, `C9a` in 2024 — line up under one name.
+- **Harmonizes** variable names across years, so that mail ballots
+  rejected—`C4a` in 2020, `C9a` in 2024—line up under one name.
 
 It does not change the numbers jurisdictions reported. EAVS records what
 election officials report, and tidyeavs hands you those values as published;
@@ -71,8 +71,8 @@ panel |>
 
 A word of caution on that `na.rm = TRUE`: a jurisdiction that didn't report an
 item is dropped from the sum, so a state total silently covers only the
-jurisdictions that reported. When a large jurisdiction is missing — Cook County
-in Illinois is the recurring example — a state total can be badly off. It's
+jurisdictions that reported. When a large jurisdiction is missing—Cook County
+in Illinois is the recurring example—a state total can be badly off. It's
 worth checking coverage before trusting an aggregate (see `eavs_missing_status()`
 below).
 
@@ -81,7 +81,7 @@ below).
 From 2018 on, EAVS marks non-substantive responses with `-88` ("does not
 apply"), `-99` ("data not available"), and `-77` ("valid skip"); 2016 and
 earlier use `-888888` and `-999999`. `eavs_load()` decodes these to `NA`, but
-the distinction between them often matters — a `0` mail-rejection count, a "does
+the distinction between them often matters—a `0` mail-rejection count, a "does
 not apply" from an all-in-person state, and a "data not available" are three
 different things. `eavs_missing_status()` recovers the reason:
 
@@ -94,7 +94,7 @@ eavs_missing_status(raw)   # each item value replaced by why it is (not) missing
 
 The dictionary maps every year's raw codes to stable concept names, and
 `eavs_items()` searches it. It answers the question you actually have in front
-of a codebook — what is `C9a`, and is it `C9a` in every year?
+of a codebook—what is `C9a`, and is it `C9a` in every year?
 
 ```r
 eavs_items("C9a")            # -> C9a is mail_rejected (in 2022 and 2024)
@@ -104,7 +104,7 @@ eavs_items(section = "C")    # all mail-ballot concepts
 
 Because the mapping is explicit, the renumbering traps become visible instead of
 silent: `eavs_items("uocava_rejected")` shows that the code is `B24a` in 2024
-but `B18a` in 2020 — and that `B18a` in 2024 is a different item entirely.
+but `B18a` in 2020—and that `B18a` in 2024 is a different item entirely.
 
 ## The pieces
 
@@ -124,7 +124,7 @@ steps add typing and structure on top of that faithful copy.
 ## Where the data lives
 
 Files are cached under `tools::R_user_dir("tidyeavs", "cache")` by default. To
-put them somewhere else — a project folder, say — set an option before you
+put them somewhere else—a project folder, say—set an option before you
 download:
 
 ```r
@@ -140,7 +140,7 @@ EAVS is collected from thousands of independent jurisdictions that keep records
 in different ways, so it carries the kinds of gaps and inconsistencies any
 survey of that scale would: items some jurisdictions can't report, categories
 that don't sum to their totals, occasional values that look off. None of this
-makes it bad data — it is, by a wide margin, the best national picture of
+makes it bad data—it is, by a wide margin, the best national picture of
 election administration there is, and its careful users treat it accordingly.
 The EAC publishes its own validation rules, revises datasets as corrections come
 in, and cautions against decontextualized comparisons. tidyeavs aims to encode

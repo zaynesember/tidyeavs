@@ -21,9 +21,10 @@ Imports:
     digest,
     dplyr,
     readr,
-    rlang,
+    stats,
     tibble,
-    tools
+    tools,
+    utils
 Suggests:
     haven,
     knitr,
