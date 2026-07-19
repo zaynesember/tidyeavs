@@ -1,5 +1,6 @@
 <!-- badges: start -->
 [![Lifecycle: experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![R-CMD-check](https://github.com/zaynesember/tidyeavs/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/zaynesember/tidyeavs/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 # tidyeavs
@@ -120,6 +121,17 @@ but `B18a` in 2020—and that `B18a` in 2024 is a different item entirely.
 `eavs_read()` returns the data exactly as published, every column as text, so
 FIPS codes keep their leading zeros and nothing is coerced or lost. The later
 steps add typing and structure on top of that faithful copy.
+
+## Jurisdictions
+
+EAVS jurisdictions are not a tidy geography: Wisconsin reports ~1,850
+municipalities under non-geographic serial codes, Maine files a statewide row
+carrying only its UOCAVA totals, Alaska and the territories file one row each,
+and a handful of published codes are shared, padded, or otherwise irregular.
+The bundled `eavs_jurisdictions` table lists every published row per year with
+its type (county, municipality, statewide, territory), the county FIPS where
+the published code embeds one, and a flag or note for each quirk—so you can
+see them before they bite an aggregate or a join.
 
 ## Where the data lives
 

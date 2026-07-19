@@ -37,14 +37,21 @@ Exported API (two tiers):
   `eavs_missing_status()`, `eavs_harmonize()`, `eavs_items()`.
 - Cache: `eavs_cache_dir()`, `eavs_cache_list()`, `eavs_cache_clear()`.
 
-Shipped datasets: `eavs_manifest` (file catalog) and `eavs_dictionary` (the
-cross-year crosswalk).
+Shipped datasets: `eavs_manifest` (file catalog), `eavs_dictionary` (the
+cross-year crosswalk), and `eavs_jurisdictions` (per-year jurisdiction rows
+with quirk flags).
+
+CI (`.github/workflows/`): `R-CMD-check.yaml` (matrix), `test-coverage.yaml`
+(prints covr to the log; no upload service), and `manifest-drift.yaml` — a
+weekly cron that re-downloads every manifest URL and fails on checksum
+mismatch, i.e. the alarm for EAC re-releases (script:
+`data-raw/check_manifest.R`).
 
 Done: scaffold, cache/download, read, recode, manifest, dictionary, harmonize,
-items, load, unit tests, README.
-Remaining (approach notes below): `eavs_jurisdictions`, `eavs_aggregate`,
-`eavs_flags`, integration tests vs published EAC report totals, vignettes, and
-the GitHub-releases data mirror.
+items, load, jurisdictions, unit tests, README, CI + drift check.
+Remaining (approach notes below): `eavs_aggregate`, `eavs_flags`, integration
+tests vs published EAC report totals, vignettes, and the GitHub-releases data
+mirror.
 
 ## How it fits together
 
@@ -113,16 +120,29 @@ Raw EAVS data is never committed — it downloads on demand into the cache.
 - **2016 sentinel format.** 2016 writes sentinels as `"CODE: Label"` (e.g.
   `"-999999: Data Not Available"`) rather than a bare number.
   `utils.R:strip_code_label()` reduces these to the code before recoding.
-- **Jurisdiction quirks** (relevant to the pending `eavs_jurisdictions` /
-  `eavs_aggregate` work). `FIPSCode` is a *string* of varying length: Wisconsin
-  uses ~1,850 five-digit non-geographic MCD serials; Maine files a statewide
-  UOCAVA pseudo-row (`"23."` in 2016, `"23"` later); Alaska is one row; Hawaii's
-  Kalawao folds into Maui; Illinois/Virginia/etc. add independent cities. Some CA
-  county codes lost a leading zero in the published file (pad to 10 before taking
-  a 5-digit county FIPS). State-prefix codes 02/09/23/55 don't align with Census
-  county FIPS. 2016 identifier columns differ (`JurisdictionName`, `State`,
-  `FIPS_2Digit`) from 2018+ (`Jurisdiction_Name`, `State_Full`, `State_Abbr`) —
-  the dictionary's `id` rows handle this.
+- **Jurisdiction quirks** — now encoded in `eavs_jurisdictions` (built by
+  `data-raw/jurisdictions.R`, whose header comment is the authoritative fact
+  list). The short version, verified against the published files: `FIPSCode`
+  is a *string* of varying length. Wisconsin uses ~1,850 five-digit
+  non-geographic serials (county only in the name; town/village pairs share a
+  serial in 2020 [82575, 84275] and 2022 [31550] — real duplicate codes in the
+  published files). Maine files a statewide UOCAVA pseudo-row (`"23."` in
+  2016, `"23"` later) and codes five townships to a `"099"` county bucket —
+  but `099` is a *real* county code in other states (Macomb MI, Stanislaus
+  CA), so never exclude it globally. Alaska and the territories are one
+  `SS00000000` row each (AS/MP join in 2020; PR skips midterms). DC is
+  `1100100000`. Kalawao HI appears every year but Maui administers it.
+  Illinois city election boards (Aurora 2016 only; Bloomington, Danville,
+  East St. Louis, Galesburg all years) are **place-coded** (`17`+place+`000`),
+  so their middle digits are not a county. Sub-county codes in
+  CT/MA/ME/NH/RI/VT do embed real county FIPS (CT's are pre-2022 Census
+  counties). 2024 Alameda/Calaveras CA lost a leading zero (9 digits). NY 2016
+  codes Yates County `3612295082` (malformed; `3612300000` from 2018). SD's
+  Oglala Lakota is `4611300000` in 2016, `4610200000` after. Exact published
+  row counts: 6467 / 6460 / 6460 / 6460 / 6461 for 2016–2024. 2016 identifier
+  columns differ (`JurisdictionName`, `State`, `FIPS_2Digit`) from 2018+
+  (`Jurisdiction_Name`, `State_Full`, `State_Abbr`) — the dictionary's `id`
+  rows handle this.
 - **`poll_worker_difficulty` is deferred.** It's an ordinal stored as text labels
   in 2016/2018 but numeric codes later; harmonizing it needs care. It's excluded
   from the shipped dictionary but kept in the source crosswalk for later.
@@ -144,10 +164,20 @@ absent.
   (the verified cross-year codes) plus curated concept metadata, writes
   `data/eavs_dictionary.rda`.
 
+- `Rscript data-raw/jurisdictions.R` — reads the raw files from the cache
+  (downloading if absent), writes `data/eavs_jurisdictions.rda`. Its header
+  comment is the fact list for jurisdiction quirks; it asserts exact published
+  row counts per year.
+- `Rscript data-raw/check_manifest.R` — verifies the published files still
+  match the manifest checksums (the weekly CI drift check runs this).
+
 **Adding a survey year:** add its rows to `data-raw/manifest.R` (verify the URLs
 first), then extend the crosswalk — for each concept, look up the new year's code
-by matching the codebook label, and record traps in `note`. Then rebuild both
-datasets and re-validate a cross-year series.
+by matching the codebook label, and record traps in `note`. Extend
+`data-raw/jurisdictions.R` too: add the new year's published row count to the
+assertion and check the new file for fresh quirks (shared codes, dropped
+zeros, new territories). Then rebuild the datasets and re-validate a
+cross-year series.
 
 ## Dev workflow
 
@@ -163,19 +193,19 @@ manifest). Real-data checks are run manually against live downloads; turning the
 "replicate published EAC report totals" check into an integration test is a
 tracked task.
 
-Reference implementation for the pending data work (jurisdiction quirks, rate
-formulas, QA/consistency checks): MIT's Elections Performance Index pipeline at
-`/Users/zaynesember/MEDSL_Git/2024-epi` — mine it for approaches, but keep
-tidyeavs corrections-free.
+Reference implementation for the pending data work (rate formulas,
+QA/consistency checks): MIT's Elections Performance Index pipeline at
+`/Users/zaynesember/MIT Git/2024-epi` — mine it for approaches, but keep
+tidyeavs corrections-free (the EPI *corrects* — e.g. it drops Kalawao and
+zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 
 ## Remaining work
 
-- **`eavs_jurisdictions`** — per cycle: jurisdiction id, type, county FIPS where
-  derivable, and quirk flags (see jurisdiction quirks above). Build from the
-  cached raw files.
 - **`eavs_aggregate`** — quirk-aware rollups to state (or county), handling the
   Maine statewide row, Wisconsin codes, and territory exclusion, with loud
-  row-count assertions. Decide the API shape.
+  row-count assertions. Decide the API shape. `eavs_jurisdictions` now carries
+  the per-row type/flags this needs; join on `year` + `fips_code` (beware the
+  three shared WI codes — `shared_code` marks them).
 - **`eavs_flags`** — a tidy table of internal-consistency flags (subparts exceed
   a total, returned > transmitted, extreme year-over-year swings). Flags, never
   mutations.
