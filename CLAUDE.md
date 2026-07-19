@@ -41,14 +41,15 @@ Shipped datasets: `eavs_manifest` (file catalog), `eavs_dictionary` (the
 cross-year crosswalk), and `eavs_jurisdictions` (per-year jurisdiction rows
 with quirk flags).
 
-CI (`.github/workflows/`): `R-CMD-check.yaml` (matrix), `test-coverage.yaml`
-(prints covr to the log; no upload service), and `manifest-drift.yaml` — a
-weekly cron that re-downloads every manifest URL and fails on checksum
-mismatch, i.e. the alarm for EAC re-releases (script:
-`data-raw/check_manifest.R`).
+**No GitHub Actions** — decided 2026-07-19; don't re-add workflows. The repo
+is private and Actions runs never start (billing-gated). Checks run locally
+instead: `devtools::check()` before committing, and
+`Rscript data-raw/check_manifest.R` every few weeks — it re-downloads every
+manifest URL and fails on checksum mismatch, i.e. the alarm for EAC
+re-releases.
 
 Done: scaffold, cache/download, read, recode, manifest, dictionary, harmonize,
-items, load, jurisdictions, unit tests, README, CI + drift check.
+items, load, jurisdictions, unit tests, README, manifest drift script.
 Remaining (approach notes below): `eavs_aggregate`, `eavs_flags`, integration
 tests vs published EAC report totals, vignettes, and the GitHub-releases data
 mirror.

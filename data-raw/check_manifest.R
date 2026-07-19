@@ -4,8 +4,8 @@
 ## happens this script fails, which is the signal to update data-raw/manifest.R
 ## (version, release_date, source_url) and rebuild the manifest.
 ##
-## Run from the package root:  Rscript data-raw/check_manifest.R
-## CI runs it weekly (.github/workflows/manifest-drift.yaml).
+## Run from the package root every few weeks:
+##   Rscript data-raw/check_manifest.R
 ##
 ## Needs only the curl and digest packages, not the package itself.
 
