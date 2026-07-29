@@ -11,17 +11,23 @@ does not change the values jurisdictions reported.
 
 ## Where things are
 
-The R package is in [`r/`](r/) — start with [its README](r/README.md) for
-installation and usage.
+There are two implementations, and neither wraps the other:
+
+- [`r/`](r/) — the R package. See [its README](r/README.md).
+- [`py/`](py/) — the Python package, returning pandas. See
+  [its README](py/README.md).
 
 The curated metadata is in [`metadata/`](metadata/): the catalog of downloadable
 files, the cross-year variable crosswalk, and the jurisdiction table, as
 committed CSV with a JSON type schema. It sits at the repo root rather than
-inside `r/` because it is not R's to own. A Python implementation is planned but
-not yet written, and when it arrives it will read these same files, so that a
+inside either package because it belongs to neither. Both read it, so a
 correction to a variable code cannot land in one language and be missed in the
-other. See [`metadata/README.md`](metadata/README.md) before editing anything
-there, and read its warning about column types before parsing the CSVs.
+other. The two were diffed against each other over all five survey years and
+agree cell for cell.
+
+See [`metadata/README.md`](metadata/README.md) before editing anything there, and
+read its warning about column types before parsing the CSVs yourself — pandas
+will silently turn a FIPS code into an integer if you let it guess.
 
 ## Data
 

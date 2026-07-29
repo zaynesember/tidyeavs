@@ -6,12 +6,12 @@ decodes their missing-value codes, and harmonizes variable names across survey
 years so jurisdictions line up over time. Development happens on the `dev`
 branch.
 
-**Repo layout.** The R package lives in `r/`, not at the repo root — moved
-2026-07-29 to make room for a planned Python implementation in `py/`. Every
-path in this file that starts `data-raw/`, `R/`, `data/`, `man/`, or `tests/`
-is relative to `r/`, and R commands are run from `r/` (or given it as the `pkg`
-argument). At the root: `CLAUDE.md`, `README.md`, `.gitignore`, `.claude/`, and
-`metadata/`.
+**Repo layout.** Two parallel implementations, both reading shared metadata.
+The R package is in `r/` (moved out of the repo root 2026-07-29) and the Python
+package in `py/` (added 2026-07-29). Every path in this file that starts
+`data-raw/`, `R/`, `data/`, `man/`, or `tests/` is relative to `r/`, and R
+commands are run from `r/` (or given it as the `pkg` argument). At the root:
+`CLAUDE.md`, `README.md`, `LICENSE`, `.gitignore`, `.claude/`, and `metadata/`.
 
 `metadata/` is the shared, committed, language-neutral metadata (added
 2026-07-29); `metadata/README.md` is authoritative on it. Two files are
@@ -46,9 +46,17 @@ relocating any loose files already listed.
 
 ## Current state
 
-`R CMD check` passes clean (0 errors / 0 warnings / 0 notes). Verified end to end
-against the published record (row counts per year, mail-rejection rates ~0.8–1.5%,
-UOCAVA rejection, drop boxes appearing only 2022+).
+`R CMD check` passes clean (0 errors / 0 warnings / 0 notes). Python: 46 unit
+tests plus 8 integration tests that need a populated cache. Both verified end to
+end against the published record (row counts per year, mail-rejection rates
+~0.8–1.5%, UOCAVA rejection, drop boxes appearing only 2022+).
+
+**The two implementations were checked against each other 2026-07-29** and agree
+exactly: `eavs_load(c(2016,2018,2020,2022,2024))` and
+`tidyeavs.load([2016,2018,2020,2022,2024])` both give 32,308 × 41, and a
+cell-by-cell diff over all five years found 0 differences. Worth redoing after
+any change to the recode or harmonize logic on either side; it is a manual check,
+not a test.
 
 Exported API (two tiers):
 
@@ -60,7 +68,14 @@ Exported API (two tiers):
 
 Shipped datasets: `eavs_manifest` (file catalog), `eavs_dictionary` (the
 cross-year crosswalk), and `eavs_jurisdictions` (per-year jurisdiction rows
-with quirk flags).
+with quirk flags). In Python the same three are functions —
+`tidyeavs.manifest()`, `.dictionary()`, `.jurisdictions()` — reading
+`metadata/` directly rather than a baked-in copy.
+
+Python dev: `cd py && pytest`. Build a wheel with `python -m build --wheel`;
+`pyproject.toml` force-includes `../metadata/` into it, so an installed package
+is self-contained and `_metadata.py` prefers that packaged copy, falling back to
+walking up to the repo's `metadata/` when running from a checkout.
 
 **No GitHub Actions** — decided 2026-07-19; don't re-add workflows. The repo
 is private and Actions runs never start (billing-gated). Checks run locally
@@ -107,6 +122,24 @@ mirror.
 (defaults to the bundled one), which is how the unit tests exercise them without
 the shipped data.
 
+`py/src/tidyeavs/` mirrors that file-for-file, deliberately: `cache.py`,
+`download.py`, `read.py`, `recode.py`, `_dictionary.py`, `harmonize.py`,
+`load.py`, plus `_constants.py` (the sentinel/token/id-pattern tables that are
+`utils.R` in R) and `_metadata.py` (loads `metadata/`; the R equivalent is the
+build-time `data-raw/` step, since R bakes the datasets into the package).
+Public names drop the `eavs_` prefix — `tidyeavs.load()`, `.read()`,
+`.harmonize()`, `.items()` — because Python namespaces by module and R does not.
+Returns pandas.
+
+Keep the two in step. When a sentinel, token, or identifier pattern changes it
+has to change in `utils.R` **and** `_constants.py`; the names match so the pair
+is easy to find. `py/tests/test_integration.py` is the guard: it reruns the
+published-record checks and is skipped unless a populated cache is present.
+
+**`_dictionary.py`, not `dictionary.py`** — a module named `dictionary` shadows
+the `dictionary()` function in the package namespace, so `tidyeavs.dictionary()`
+became "module object is not callable". Don't rename it back.
+
 ## Data model
 
 **`eavs_manifest`** — one row per downloadable file. Columns: `survey`
@@ -149,9 +182,16 @@ Raw EAVS data is never committed — it downloads on demand into the cache.
   (Section A was redesigned). The dictionary encodes the correct code per year;
   the `note` column spells out each trap. When adding concepts, verify every
   year's code against that year's codebook label — never assume a code is stable.
-- **Encoding.** EAVS CSVs are usually Windows-1252 (Excel/SPSS exports), which
-  breaks a naive UTF-8 read on names like "Doña Ana." `read.R:file_encoding()`
-  detects UTF-8 vs Windows-1252 per file.
+- **Encoding.** Detect it per file; don't assume UTF-8. `read.R:bytes_encoding()`
+  and `py/.../read.py:detect_encoding()` try UTF-8 and fall back to Windows-1252.
+  Verified across the five cached cycles 2026-07-29: **only 2016 is
+  Windows-1252**, and what makes it fail a UTF-8 read is curly quotes (`0x93`,
+  `0x94`) in question-label and comment text, *not* an accented place name. 2018
+  through 2024 are already UTF-8. The docs used to cite "Doña Ana" as the reason
+  for the fallback, which conflated two things: that spelling (with its tilde)
+  appears only in **2018**, which is UTF-8 and reads fine either way; 2016 and
+  2020+ publish it as plain "DONA ANA". The fallback is still load-bearing —
+  2016 genuinely is not valid UTF-8 — just not for the reason previously given.
 - **2016 sentinel format.** 2016 writes sentinels as `"CODE: Label"` (e.g.
   `"-999999: Data Not Available"`) rather than a bare number.
   `utils.R:strip_code_label()` reduces these to the code before recoding.
@@ -268,10 +308,8 @@ zeroes Maine's statewide row; tidyeavs *flags* the same rows).
   decouples "the EAC re-released a file" from "the package broke for everyone" —
   today a re-release makes `eavs_download()` abort on checksum mismatch
   (`download.R:113`) until the manifest is updated.
-- **Python package** in `py/` — a parallel implementation, not a binding; there's
-  no compiled core to wrap, and `rpy2` was rejected (it would make every Python
-  user install R). Roughly 500 lines: resolve a cache dir, fetch and verify a
-  checksum, read all-character, map negatives to `NA`, rename, concatenate. It
-  reads `metadata/` rather than shipping its own copy — see the type warning
-  there, because a naive `pd.read_csv` destroys FIPS leading zeros. Decide
-  pandas vs polars. No longer blocked.
+- **Python packaging polish** — the package works and is verified, but is not
+  published. Not done: PyPI release, a lint/type setup (ruff + mypy), and
+  `mirror_url` support exercised end to end (the code path exists but every
+  `mirror_url` is still empty). `py/` has no CI, same as `r/`; run
+  `pytest` in `py/` and `devtools::check()` in `r/` before committing.

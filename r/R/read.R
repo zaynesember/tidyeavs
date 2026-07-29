@@ -69,10 +69,11 @@ read_raw_csv <- function(path) {
   )
 }
 
-# EAVS CSVs are usually Windows-1252 (Excel/SPSS exports), which breaks a
-# UTF-8 read on place names like "Doña Ana". Detect the encoding from the
-# file's bytes: use UTF-8 if they are valid UTF-8, otherwise fall back to
-# Windows-1252.
+# Some EAVS CSVs are Windows-1252 (Excel/SPSS exports), so a UTF-8 read fails
+# outright on them. Of the 2016-2024 cycles only 2016 is, where the offending
+# bytes are curly quotes in the question-label and comment text. Detect the
+# encoding from the file's bytes: use UTF-8 if they are valid UTF-8, otherwise
+# fall back to Windows-1252.
 bytes_encoding <- function(bytes) {
   s <- tryCatch(
     {
