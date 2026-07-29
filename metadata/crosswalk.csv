@@ -1,0 +1,201 @@
+concept,year,code,codebook_label,confidence,note
+ballots_cured,2016,,,high,NA: curing counts not collected in 2016.
+ballots_cured,2018,,,high,NA: not collected in 2018.
+ballots_cured,2020,,,high,NA: not collected in 2020.
+ballots_cured,2022,C7a,C7a Total Mail Ballots Cured,high,FIRST YEAR PRESENT. C7a='Total Mail Ballots Cured' - a single combined field (ballots that were cured).
+ballots_cured,2024,C7b,C7b Mail Ballots Successfully Cured,medium,"AMBIGUOUS (medium): 2024 SPLIT curing into C7a='Total Mail Ballots That Entered Curing' (denominator), C7b='Mail Ballots Successfully Cured', C7c='Unsuccessfully Cured'. Mapped to C7b as the best match for 'initially rejected that were later cured' (successfully cured). If you need the count that entered curing (analog of 2022 C7a), use C7a instead - but C7a-2024 != C7a-2022 in meaning."
+drop_boxes_total,2016,,,high,NA: drop-box counts not collected in 2016.
+drop_boxes_total,2018,,,high,NA: not collected in 2018.
+drop_boxes_total,2020,,,high,NA: not collected in 2020 (Section C ends at C4).
+drop_boxes_total,2022,C3a,C3a Total Ballot Drop Boxes Used for General Election,high,FIRST YEAR PRESENT. C3a='Total Ballot Drop Boxes Used for General Election'. Note C3a meant 'mail ballots counted' in 2018/2020 (see mail_counted trap).
+drop_boxes_total,2024,C3a,C3a Drop Boxes Total,high,C3a='Drop Boxes Total'.
+fips_code,2016,FIPSCode,,high,
+fips_code,2018,FIPSCode,,high,
+fips_code,2020,FIPSCode,,high,
+fips_code,2022,FIPSCode,,high,
+fips_code,2024,FIPSCode,,high,
+fwab_counted,2016,,,high,NA: 2016 has no standalone FWAB-counted total. FWAB counted appears only as a military/civilian/other breakdown (B11a/B11b/B11c) that rolls into the B8 UOCAVA counted total; no single total variable.
+fwab_counted,2018,B24a,UOCAVA FWABs Counted: Total,high,B24a='UOCAVA FWABs Counted: Total'.
+fwab_counted,2020,B24a,B24a Total FWABs Counted,high,B24a='Total FWABs Counted'. TRAP: B24a-2024='UOCAVA Rejected Total'.
+fwab_counted,2022,B24a,B24a Total FWABs Counted,high,B24a='Total FWABs Counted'. TRAP: B24a-2024='UOCAVA Rejected Total'.
+fwab_counted,2024,B30a,B30a Total FWABs Counted,high,B30a (EPI totalFwabCount=B30a). Code shifted B24a(2018-2022)->B30a(2024). TRAP: B24a-2024='UOCAVA Rejected Total'.
+fwab_returned,2016,,,high,NA: 2016 EAVS did not collect a FWAB-returned total. 2016 Section B omits several items delegated to FVAP (intro: B19-B35 from FVAP; B3-B7 also absent) - no FWAB returned variable exists.
+fwab_returned,2018,B23a,UOCAVA FWABs Returned: Total,high,B23a='UOCAVA FWABs Returned: Total'.
+fwab_returned,2020,B23a,B23a Total FWABs Returned,high,B23a='Total FWABs Returned'.
+fwab_returned,2022,B23a,B23a Total FWABs Returned,high,B23a='Total FWABs Returned'.
+fwab_returned,2024,B29a,B29a Total FWABs Returned,high,B29a (EPI totalFwabReturn=B29a). Code shifted B23a(2018-2022)->B29a(2024). TRAP: B23a-2024='Other Counted Total'.
+jurisdiction_name,2016,JurisdictionName,,high,
+jurisdiction_name,2018,Jurisdiction_Name,,high,
+jurisdiction_name,2020,Jurisdiction_Name,,high,
+jurisdiction_name,2022,Jurisdiction_Name,,high,
+jurisdiction_name,2024,Jurisdiction_Name,,high,
+mail_counted,2016,C4a,C4a. Absentee ballots returned: counted,high,2016 uses C4a='Absentee ballots returned: counted'. TRAP: C4a-2018/2020='By-mail Rejected Total' (REJECTED); C4a-2022/2024='Drop Boxes Election Day Total'.
+mail_counted,2018,C3a,By-mail Ballots Counted: Total,high,C3a='By-mail Ballots Counted: Total'. TRAP: C3a-2022/2024='Drop Boxes Total'.
+mail_counted,2020,C3a,C3a By-mail Counted Total,high,C3a (EPI anchor C8a-2024=C3a-2020). TRAP: C3a-2022/2024='Drop Boxes Total'; C8a does not exist in 2020.
+mail_counted,2022,C8a,C8a Total Mail Ballots Counted,high,"C8a='Total Mail Ballots Counted'. NOTE: 2022 ALREADY matches 2024 (C8a), NOT 2020 (C3a) - the hard break is 2020->2022 (drop-box questions C3-C6 inserted, pushing counted to C8)."
+mail_counted,2024,C8a,C8a Total Mail Ballots Counted,high,C8a (EPI domAbs_Counted=C8a). Code path: C4a(2016)->C3a(2018/2020)->C8a(2022/2024). TRAP: C3a-2024='Drop Boxes Total'.
+mail_rejected,2016,C4b,C4b. Absentee ballots returned: rejected,high,"2016 uses C4b='Absentee ballots returned: rejected'. TRAP: C4b-2018+ ='By-mail Rejected: Deadline' (a rejection REASON, not the total)."
+mail_rejected,2018,C4a,By-mail Ballots Rejected: Total,high,C4a='By-mail Ballots Rejected: Total'. TRAP: C4a-2016='counted'; C4a-2022/2024='Drop Boxes Election Day Total'.
+mail_rejected,2020,C4a,C4a By-mail Rejected Total,high,C4a (EPI anchor C9a-2024=C4a-2020). TRAP: C4a-2022/2024='Drop Boxes Election Day Total'; C9a does not exist in 2020.
+mail_rejected,2022,C9a,C9a Mail Rejected Total,high,"C9a='Mail Rejected Total'. NOTE: 2022 matches 2024 (C9a), NOT 2020 (C4a) - hard break 2020->2022."
+mail_rejected,2024,C9a,C9a Total Mail Ballots Rejected,high,C9a (EPI domAbs_Rejected=C9a). Code path: C4b(2016)->C4a(2018/2020)->C9a(2022/2024). TRAP: C4a-2024='Drop Boxes Election Day Total'.
+mail_returned,2016,C1b,C1b. Absentee ballots transmitted: returned,high,C1b; 2016 label 'returned' (returned by voter). Same code C1b all years.
+mail_returned,2018,C1b,By-mail Transmitted: Returned for Counting,high,Mail/absentee ballots returned by voters: Total. Same code C1b all years.
+mail_returned,2020,C1b,C1b By-mail Returned By Voters Total,high,Mail/absentee ballots returned by voters: Total. Same code C1b all years.
+mail_returned,2022,C1b,C1b Mail Returned By Voters Total,high,Mail/absentee ballots returned by voters: Total. Same code C1b all years.
+mail_returned,2024,C1b,C1b Mail Returned By Voters Total,high,Mail/absentee ballots returned by voters: Total. Same code C1b all years.
+mail_spoiled,2016,C1d,C1d. Absentee ballots transmitted: spoiled or replaced ballots,high,C1d (2016 category='Spoiled or replaced ballots'; 2018+ label='Voided'). Same code C1d all years.
+mail_spoiled,2018,C1d,By-mail Transmitted: Voided,high,"Mail ballots spoiled/voided/replaced. Same code C1d all years (label 'Voided' 2018+, 'Spoiled or replaced' 2016)."
+mail_spoiled,2020,C1d,C1d By-mail Voided,high,"Mail ballots spoiled/voided/replaced. Same code C1d all years (label 'Voided' 2018+, 'Spoiled or replaced' 2016)."
+mail_spoiled,2022,C1d,C1d Mail Voided,high,"Mail ballots spoiled/voided/replaced. Same code C1d all years (label 'Voided' 2018+, 'Spoiled or replaced' 2016)."
+mail_spoiled,2024,C1d,C1d Mail Voided,high,"Mail ballots spoiled/voided/replaced. Same code C1d all years (label 'Voided' 2018+, 'Spoiled or replaced' 2016)."
+mail_transmitted,2016,C1a,C1a. Absentee ballots transmitted: Total,high,C1a; label 'Absentee ballots transmitted' (term 'absentee' in 2016 -> 'by-mail'/'mail' later). Same code C1a all years.
+mail_transmitted,2018,C1a,By-mail Transmitted: Total,high,Domestic mail/absentee ballots transmitted: Total. Same code C1a all years.
+mail_transmitted,2020,C1a,C1a By-mail Transmitted Total,high,Domestic mail/absentee ballots transmitted: Total. Same code C1a all years.
+mail_transmitted,2022,C1a,C1a Mail Transmitted Total,high,Domestic mail/absentee ballots transmitted: Total. Same code C1a all years.
+mail_transmitted,2024,C1a,C1a Mail Transmitted Total,high,Domestic mail/absentee ballots transmitted: Total. Same code C1a all years.
+mail_undeliverable,2016,C1c,C1c. Absentee ballots transmitted: returned as undeliverable,high,C1c (2016 label wraps; category='Returned as undeliverable'). Same code C1c all years.
+mail_undeliverable,2018,C1c,By-mail Transmitted: Returned Undeliverable,high,Mail ballots returned undeliverable. Same code C1c all years.
+mail_undeliverable,2020,C1c,C1c By-mail Returned Undeliverable,high,Mail ballots returned undeliverable. Same code C1c all years.
+mail_undeliverable,2022,C1c,C1c Mail Returned Undeliverable,high,Mail ballots returned undeliverable. Same code C1c all years.
+mail_undeliverable,2024,C1c,C1c Mail Returned Undeliverable,high,Mail ballots returned undeliverable. Same code C1c all years.
+partic_all_mail,2016,F1g,F1g. Participation: Vote by mail in vote by mail jurisdiction,high,Participation: mail votes in vote-by-mail jurisdictions. Same code F1g all years.
+partic_all_mail,2018,F1g,Participation: Vote By Mail Jurisdiction,high,Participation: mail votes in vote-by-mail jurisdictions. Same code F1g all years.
+partic_all_mail,2020,F1g,F1g Vote By Mail Jurisdiction,high,Participation: mail votes in vote-by-mail jurisdictions. Same code F1g all years.
+partic_all_mail,2022,F1g,F1g Mail Votes in Vote-By-Mail Jurisdiction,high,Participation: mail votes in vote-by-mail jurisdictions. Same code F1g all years.
+partic_all_mail,2024,F1g,F1g Mail Votes in Vote-By-Mail Jurisdiction,high,Participation: mail votes in vote-by-mail jurisdictions. Same code F1g all years.
+partic_by_mail,2016,F1d,F1d. Participation: Absentee,medium,"F1d, but 2016 label='Absentee' (domestic absentee); relabeled 'By Mail'/'Mail Votes' in 2018+. WORDING CHANGE - same F1d slot/concept, confirm the absentee->by-mail terminology shift is acceptable."
+partic_by_mail,2018,F1d,Participation: By Mail,high,Participation: domestic by-mail. Same code F1d all years.
+partic_by_mail,2020,F1d,F1d By Mail Votes,high,Participation: domestic by-mail. Same code F1d all years.
+partic_by_mail,2022,F1d,F1d Mail Votes,high,Participation: domestic by-mail. Same code F1d all years.
+partic_by_mail,2024,F1d,F1d Mail Votes,high,Participation: domestic by-mail. Same code F1d all years.
+partic_early_in_person,2016,F1f,F1f. Participation: Early vote center,high,F1f; 2016 label='Early vote center' -> 'In Person Early Voting' (2018+). Same code F1f all years.
+partic_early_in_person,2018,F1f,Participation: In Person Early Voting,high,Participation: in-person early voting. Same code F1f all years.
+partic_early_in_person,2020,F1f,F1f In Person Early Voting,high,Participation: in-person early voting. Same code F1f all years.
+partic_early_in_person,2022,F1f,F1f In Person Early Voting,high,Participation: in-person early voting. Same code F1f all years.
+partic_early_in_person,2024,F1f,F1f In Person Early Voting,high,Participation: in-person early voting. Same code F1f all years.
+partic_in_person_ed,2016,F1b,F1b. Participation: Physical polling place on Election Day,high,Participation: in-person Election Day polling place. Same code F1b all years.
+partic_in_person_ed,2018,F1b,Participation: Physical Polling Place on Election Day,high,Participation: in-person Election Day polling place. Same code F1b all years.
+partic_in_person_ed,2020,F1b,F1b Physical Polling Place,high,Participation: in-person Election Day polling place. Same code F1b all years.
+partic_in_person_ed,2022,F1b,F1b In Person Election Day,high,Participation: in-person Election Day polling place. Same code F1b all years.
+partic_in_person_ed,2024,F1b,F1b Physical Polling Place,high,Participation: in-person Election Day polling place. Same code F1b all years.
+partic_provisional,2016,F1e,F1e. Participation: Provisional ballot,high,Participation: provisional ballot. Same code F1e all years.
+partic_provisional,2018,F1e,Participation: Provisional Ballot,high,Participation: provisional ballot. Same code F1e all years.
+partic_provisional,2020,F1e,F1e Provisional Ballot,high,Participation: provisional ballot. Same code F1e all years.
+partic_provisional,2022,F1e,F1e Provisional Ballot,high,Participation: provisional ballot. Same code F1e all years.
+partic_provisional,2024,F1e,F1e Provisional Ballot,high,Participation: provisional ballot. Same code F1e all years.
+partic_total,2016,F1a,F1a. Participation: Total,high,Total voters who participated/cast a counted ballot. Same code F1a all years.
+partic_total,2018,F1a,Participation: Total,high,Total voters who participated/cast a counted ballot. Same code F1a all years.
+partic_total,2020,F1a,F1a Total Participating Voters,high,Total voters who participated/cast a counted ballot. Same code F1a all years.
+partic_total,2022,F1a,F1a Total Voters Who Cast a Ballot That Was Counted,high,F1a; 2022 label clarifies 'Total Voters Who Cast a Ballot That Was Counted'. Same code F1a all years.
+partic_total,2024,F1a,F1a Total Voters,high,Total voters who participated/cast a counted ballot. Same code F1a all years.
+partic_uocava,2016,F1c,F1c. Participation: UOCAVA,high,F1c='Participation: UOCAVA'. Same code F1c all years. NOTE 2016 also has separate F1d='Absentee' (domestic) -> mapped to partic_by_mail.
+partic_uocava,2018,F1c,Participation: UOCAVA,high,"Participation: UOCAVA/absentee. Same code F1c all years (label 'UOCAVA' 2016/2018, 'Absentee UOCAVA' 2020+)."
+partic_uocava,2020,F1c,F1c Absentee UOCAVA,high,"Participation: UOCAVA/absentee. Same code F1c all years (label 'UOCAVA' 2016/2018, 'Absentee UOCAVA' 2020+)."
+partic_uocava,2022,F1c,F1c Absentee UOCAVA,high,"Participation: UOCAVA/absentee. Same code F1c all years (label 'UOCAVA' 2016/2018, 'Absentee UOCAVA' 2020+)."
+partic_uocava,2024,F1c,F1c Absentee UOCAVA,high,"Participation: UOCAVA/absentee. Same code F1c all years (label 'UOCAVA' 2016/2018, 'Absentee UOCAVA' 2020+)."
+poll_worker_difficulty,2016,D5,D5. Difficultly obtaining poll workers,high,D5='Difficultly obtaining poll workers' (sic; ordinal 1=Very difficult..5=Very easy). TRAP: D5-2020+ ='Total Poll Workers Election Day' (a count).
+poll_worker_difficulty,2018,D9,Poll Workers Recruiting Difficulty,high,D9='Poll Workers Recruiting Difficulty' (ordinal).
+poll_worker_difficulty,2020,D8,D8 Recruiting Difficulty,high,D8='Recruiting Difficulty' (ordinal). Code path D5(2016)->D9(2018)->D8(2020+). TRAP: D8a-2018='Poll Workers: Total' (a count).
+poll_worker_difficulty,2022,D8,D8 Recruiting Difficulty,high,D8 (ordinal). Stable 2020-2024.
+poll_worker_difficulty,2024,D8,D8 Recruiting Difficulty,high,D8 (ordinal). Stable 2020-2024.
+poll_workers_total,2016,D3a,D3a. Poll workers: Total,high,"D3a='Poll workers: Total'. TRAP: D3a-2020/2022/2024='Total Polling Places Election Day' (polling places, NOT poll workers)."
+poll_workers_total,2018,D8a,Poll Workers: Total,high,"D8a='Poll Workers: Total'. TRAP: D8-2020+ ='Recruiting Difficulty' (ordinal, not a count)."
+poll_workers_total,2020,D7a,D7a Total Poll Workers,high,D7a='Total Poll Workers'. Code path D3a(2016)->D8a(2018)->D7a(2020+).
+poll_workers_total,2022,D7a,D7a Total Poll Workers,high,D7a. Stable 2020-2024.
+poll_workers_total,2024,D7a,D7a Total Poll Workers,high,D7a. Stable 2020-2024.
+polling_places_ed,2016,,,low,"NA (low): 2016 has NO single Election Day polling-place total. D2a='Physical Polling Places: Total' is the GRAND total incl. early voting; the ED total must be summed from D2b (ED, not election office) + D2c (ED, election office) + D2d (ED, other). Not directly comparable to D4a-2018/D3a-2020+."
+polling_places_ed,2018,D4a,Election Day Polling Places: Total,high,D4a='Election Day Polling Places: Total'. TRAP: D3a-2018='Number of Precincts: Total' (precincts).
+polling_places_ed,2020,D3a,D3a Total Polling Places Election Day,high,D3a='Total Polling Places Election Day'. Code shifted D4a(2018)->D3a(2020+).
+polling_places_ed,2022,D3a,D3a Total Polling Places Election Day,high,D3a. Stable 2020-2024.
+polling_places_ed,2024,D3a,D3a Total Polling Places Election Day,high,D3a. Stable 2020-2024. (EPI lists only subparts D3b/D3c; D3a is the ED total from the codebook.)
+prov_counted_full,2016,E1b,E1b. Provisional ballots submitted: Counted full ballot,high,Provisional ballots counted in full. Same code E1b all years.
+prov_counted_full,2018,E1b,Provisional Ballots: Counted Full Ballot,high,Provisional ballots counted in full. Same code E1b all years.
+prov_counted_full,2020,E1b,E1b Provisional Counted Full Ballot,high,Provisional ballots counted in full. Same code E1b all years.
+prov_counted_full,2022,E1b,E1b Provisional Counted Full Ballot,high,Provisional ballots counted in full. Same code E1b all years.
+prov_counted_full,2024,E1b,E1b Provisional Ballots Fully Counted,high,Provisional ballots counted in full. Same code E1b all years.
+prov_counted_partial,2016,E1c,E1c. Provisional ballots submitted: Counted part of ballot,high,Provisional ballots counted in part. Same code E1c all years.
+prov_counted_partial,2018,E1c,Provisional Ballots: Counted Part of Ballot,high,Provisional ballots counted in part. Same code E1c all years.
+prov_counted_partial,2020,E1c,E1c Provisional Counted Part of Ballot,high,Provisional ballots counted in part. Same code E1c all years.
+prov_counted_partial,2022,E1c,E1c Provisional Counted Part of Ballot,high,Provisional ballots counted in part. Same code E1c all years.
+prov_counted_partial,2024,E1c,E1c Provisional Ballots Partially Counted,high,Provisional ballots counted in part. Same code E1c all years.
+prov_rejected,2016,E1d,E1d. Provisional ballots submitted: Rejected,high,E1d='Provisional ballots submitted: Rejected'. In 2016 there is NO rejection-reasons total header (E2a-E2p are reasons); E1d is the only rejected total.
+prov_rejected,2018,E1d,Provisional Ballots: Rejected Ballot,high,E1d (disposition-series rejected). A parallel reasons-total exists at E2a-2018 ('Provisional Ballots Rejected: Total').
+prov_rejected,2020,E1d,E1d Provisional Rejected Ballot,high,E1d (disposition-series rejected). Parallel reasons-total = E2a-2020 ('Rejected Provisional').
+prov_rejected,2022,E1d,E1d Provisional Rejected Ballot,high,"E1d (disposition-series rejected). Parallel reasons-total moved to E3a-2022 ('Provisional Rejected Total'); E2a-2022='Not on List of Eligible Voters' (a CAST reason, TRAP)."
+prov_rejected,2024,E1d,E1d Provisional Ballots Rejected,high,"RESOLUTION: use E1d (EPI concept map prov_Rejected=E1d), the disposition-series total present & consistent in ALL 5 years. EPI QA used E3a-2024='Rejected Provisional' (header of the rejection-REASONS series); E3a and E1d represent the SAME total-rejected quantity, but E3a exists only in 2022/2024 (analog E2a in 2018/2020), and E2a-2022/2024 is a CAST reason ('Not on List of Eligible Voters') - a trap. E1d is the safer cross-year mapping. E3a is NOT a named concept in epi_concepts_2024.csv."
+prov_submitted,2016,E1a,E1a. Provisional ballots submitted: Total,high,Provisional ballots submitted/cast: Total. Same code E1a all years.
+prov_submitted,2018,E1a,Provisional Ballots: Total,high,Provisional ballots submitted/cast: Total. Same code E1a all years.
+prov_submitted,2020,E1a,E1a Total Provisional,high,Provisional ballots submitted/cast: Total. Same code E1a all years.
+prov_submitted,2022,E1a,E1a Total Provisional,high,Provisional ballots submitted/cast: Total. Same code E1a all years.
+prov_submitted,2024,E1a,E1a Total Provisional Ballots Cast,high,Provisional ballots submitted/cast: Total. Same code E1a all years.
+reg_active,2016,A3a,A3a. Registered voters: Active,high,"TRAP: 2016 uses A3a (Section A numbered differently: A3a='Registered voters: Active'). In 2018-2024 A3a='registration-forms total', a completely different quantity."
+reg_active,2018,A1b,Total Active Voters,high,A1b in 2018-2024. Active registered voters.
+reg_active,2020,A1b,A1b Total Active,high,Active registered voters.
+reg_active,2022,A1b,A1b Total Active,high,Active registered voters.
+reg_active,2024,A1b,A1b Total Active,high,Active registered voters.
+reg_confirmations_sent,2016,A10a,A10a. Notifications: Total,high,2016 A10a='Notifications: Total' (coincidentally same code as 2024).
+reg_confirmations_sent,2018,A8a,Notifications: Total,high,"A8a. TRAP: A8a-2024='Mail Invalid' (invalid regs by source), NOT notifications."
+reg_confirmations_sent,2020,A8a,A8a Notifications Total,high,"A8a. TRAP: A8a-2024='Mail Invalid', NOT notifications."
+reg_confirmations_sent,2022,A8a,A8a Notifications Total,high,"A8a. TRAP: A8a-2024='Mail Invalid', NOT notifications."
+reg_confirmations_sent,2024,A10a,A10a Notifications Total,high,A10a (EPI totalConfirmation=A10a). Code shifted A8a(2018-2022)->A10a(2024) in the Section A redesign. TRAP: A8a-2024='Mail Invalid'.
+reg_eligible_total,2016,A1a,A1a. Registered voters: Total,high,Total registered & eligible voters. Same code A1a in all 5 years; stable.
+reg_eligible_total,2018,A1a,Total Registered Voters,high,Total registered & eligible voters. Same code A1a in all 5 years; stable.
+reg_eligible_total,2020,A1a,A1a Total Reg,high,Total registered & eligible voters. Same code A1a in all 5 years; stable.
+reg_eligible_total,2022,A1a,A1a Total Reg,high,Total registered & eligible voters. Same code A1a in all 5 years; stable.
+reg_eligible_total,2024,A1a,A1a Total Reg,high,Total registered & eligible voters. Same code A1a in all 5 years; stable.
+reg_forms_received,2016,A5a,A5a. Registration forms: Total,high,"2016 uses A5a='Registration forms: Total' (2016 Section A puts the forms breakdown in A5, not A3)."
+reg_forms_received,2018,A3a,Registration Forms: Total,high,"A3a. TRAP: in 2016 A3a='Registered voters: Active', not forms."
+reg_forms_received,2020,A3a,A3a Total Registered Forms,high,Total registration forms/transactions received.
+reg_forms_received,2022,A3a,A3a Total Registered Forms,high,Total registration forms/transactions received.
+reg_forms_received,2024,A3a,A3a Total Reg Transactions,medium,"A3a (EPI totalForm=A3a). WORDING/DEFINITION CHANGE: 2024 Section A redesign relabeled 'Forms'->'Total Reg Transactions' and added 'Updates' (A3e) as a category, so the composition of the total shifted vs 2018-2022 'Total Registered Forms'."
+reg_inactive,2016,A3b,A3b. Registered voters: Inactive,high,"TRAP: 2016 uses A3b='Registered voters: Inactive'. In 2018-2024 A3b='registration-forms New Valid', a different quantity."
+reg_inactive,2018,A1c,Total Inactive Voters,high,Inactive registered voters.
+reg_inactive,2020,A1c,A1c Total Inactive,high,Inactive registered voters.
+reg_inactive,2022,A1c,A1c Total Inactive,high,Inactive registered voters.
+reg_inactive,2024,A1c,A1c Total Inactive,high,Inactive registered voters.
+reg_new_valid,2016,A5b,A5b. Registration forms: New valid,high,2016 uses A5b (forms breakdown under A5).
+reg_new_valid,2018,A3b,Registration Forms: New Valid,high,New valid registrations.
+reg_new_valid,2020,A3b,A3b New Valid,high,New valid registrations.
+reg_new_valid,2022,A3b,A3b New Valid,high,New valid registrations.
+reg_new_valid,2024,A3b,A3b New Valid,high,New valid registrations.
+reg_rejected,2016,A5e,A5e. Registration forms: invalid or rejected,high,2016 code A5e ='Registration forms: invalid or rejected' (verified 'invalid or rejected' wording).
+reg_rejected,2018,A3e,Registration Forms: Invalid or Rejected,high,"A3e ='Registration Forms: Invalid or Rejected' (verified). TRAP: A3f-2018='Change to name, party...' (NOT rejected)."
+reg_rejected,2020,A3e,A3e Invalid,high,A3e ='Invalid' (verified). TRAP: A3f-2020='Changes' (NOT rejected).
+reg_rejected,2022,A3e,A3e Invalid,high,A3e ='Invalid' (verified). TRAP: A3f-2022='Changes' (NOT rejected).
+reg_rejected,2024,A3f,A3f Invalid,high,A3f ='Invalid' (EPI form_Rejected=A3f). HEADLINE TRAP: rejected moved A3e->A3f in the 2024 redesign; A3e-2024='Updates' (NOT rejected). So A3e means 'invalid/rejected' in 2016/2018/2020/2022 but 'Updates' in 2024; A3f means 'invalid/rejected' only in 2024 (='Changes' in 2018-2022).
+reg_removed_total,2016,A11a,A11a. Voters removed: Total,high,2016 A11a='Voters removed: Total'.
+reg_removed_total,2018,A9a,Voters Removed: Total,high,"A9a. TRAP: A9a-2024='Mail Other', NOT removed; A12a does not exist in 2018."
+reg_removed_total,2020,A9a,A9a Removed Total,high,"A9a. TRAP: A9a-2024='Mail Other', NOT removed."
+reg_removed_total,2022,A9a,A9a Removed Total,high,"A9a. TRAP: A9a-2024='Mail Other', NOT removed."
+reg_removed_total,2024,A12a,A12a Removed Total,high,A12a (EPI totalRemoved=A12a). Code shifted A9a(2018-2022)->A12a(2024). TRAP: A9a-2024='Mail Other'.
+state_abbr,2016,State,,high,
+state_abbr,2018,State_Abbr,,high,
+state_abbr,2020,State_Abbr,,high,
+state_abbr,2022,State_Abbr,,high,
+state_abbr,2024,State_Abbr,,high,
+state_name,2016,,,high,
+state_name,2018,State_Full,,high,
+state_name,2020,State_Full,,high,
+state_name,2022,State_Full,,high,
+state_name,2024,State_Full,,high,
+uocava_counted,2016,B8a,B8a. UOCAVA ballots counted: Total,high,2016 uses B8a='UOCAVA ballots counted: Total'.
+uocava_counted,2018,B14a,UOCAVA Ballots Counted: Total,high,B14a='UOCAVA Ballots Counted: Total'. TRAP: B18a-2018='UOCAVA Ballots Rejected: Total' (REJECTED).
+uocava_counted,2020,B14a,B14a UOCAVA Counted Total,high,"B14a (EPI anchor B18a-2024=B14a-2020). HEADLINE TRAP: B18a-2020='UOCAVA Rejected Total' (REJECTED, not counted)."
+uocava_counted,2022,B14a,B14a UOCAVA Counted Total,high,B14a. HEADLINE TRAP: B18a-2022='UOCAVA Rejected Total' (REJECTED).
+uocava_counted,2024,B18a,B18a UOCAVA Counted Total,high,B18a (EPI totalUocavaCount=B18a). HEADLINE TRAP: B18a means 'UOCAVA counted' in 2024 but 'UOCAVA rejected' in 2016(B13a rej)/2018/2020/2022. B14a-2024='Fax Returned Total'.
+uocava_rejected,2016,B13a,B13a. UOCAVA ballots rejected: Total,high,2016 uses B13a='UOCAVA ballots rejected: Total'.
+uocava_rejected,2018,B18a,UOCAVA Ballots Rejected: Total,high,"B18a='UOCAVA Ballots Rejected: Total'. TRAP: B24a-2018='FWABs Counted: Total' (FWAB counted, not UOCAVA rejected)."
+uocava_rejected,2020,B18a,B18a UOCAVA Rejected Total,high,B18a (EPI anchor B24a-2024=B18a-2020). TRAP: B24a-2020='Total FWABs Counted'.
+uocava_rejected,2022,B18a,B18a UOCAVA Rejected Total,high,B18a. TRAP: B24a-2022='Total FWABs Counted'.
+uocava_rejected,2024,B24a,B24a UOCAVA Rejected Total,high,B24a (EPI totalUocavaReject=B24a). TRAP: B24a means 'UOCAVA rejected' in 2024 but 'FWABs Counted total' in 2018/2020/2022; B18a-2024='UOCAVA Counted' (see uocava_counted).
+uocava_returned,2016,B2a,B2a. Transmitted UOCAVA ballots: returned and submitted for counting,high,2016 uses B2a='Transmitted UOCAVA ballots: returned and submitted for counting'.
+uocava_returned,2018,B9a,UOCAVA Ballots Returned: Total,high,"B9a='UOCAVA Ballots Returned: Total'. TRAP: B11a-2018='Ballots Returned: Email' (sub-mode, not total)."
+uocava_returned,2020,B9a,B9a UOCAVA Returned Total,high,"B9a (EPI anchor B11a-2024=B9a-2020). TRAP: B11a-2020='Email Returned Total', not the overall total."
+uocava_returned,2022,B9a,B9a UOCAVA Returned Total,high,B9a (2022 shares 2020 numbering). TRAP: B11a-2022='Email Returned Total'.
+uocava_returned,2024,B11a,B11a UOCAVA Returned Total,high,B11a (EPI totalAbsSubmit=B11a). TRAP: code shifted +2 (B9a->B11a) because 2024 added Fax(B8)+Online(B9) transmit modes. B9a-2024='Online Transmitted Total' (NOT returned).
+uocava_transmitted,2016,B1a,B1a. UOCAVA ballots transmitted: Total,high,"2016 uses B1a='UOCAVA ballots transmitted: Total'. TRAP: B1a-2018+='UOCAVA Total Reg' (registered voters, NOT transmitted)."
+uocava_transmitted,2018,B5a,UOCAVA Transmitted Ballots: Total,high,B5a; same code 2018-2024.
+uocava_transmitted,2020,B5a,B5a UOCAVA Transmitted Total,high,UOCAVA ballots transmitted: Total.
+uocava_transmitted,2022,B5a,B5a UOCAVA Transmitted Total,high,UOCAVA ballots transmitted: Total.
+uocava_transmitted,2024,B5a,B5a UOCAVA Transmitted Total,high,UOCAVA ballots transmitted: Total.

@@ -157,3 +157,9 @@ stopifnot(identical(
 save(eavs_jurisdictions, file = "data/eavs_jurisdictions.rda", compress = "xz")
 message("Wrote data/eavs_jurisdictions.rda (", nrow(eavs_jurisdictions),
         " rows, ", length(unique(eavs_jurisdictions$year)), " years)")
+
+# Also write the shared copy any future Python package reads. The quirk logic
+# above is the part worth not reimplementing twice, so the table crosses the
+# language boundary as data. Generated, not hand-edited.
+readr::write_csv(eavs_jurisdictions, "../metadata/jurisdictions.csv", na = "")
+message("Wrote ../metadata/jurisdictions.csv")

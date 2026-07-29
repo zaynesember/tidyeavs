@@ -1,8 +1,15 @@
-## Checks that the files published at the URLs in eavs_manifest still match
-## their pinned SHA-256 checksums. The EAC re-releases revised versions of a
-## cycle for years after the first release, and eac.gov URLs churn; when either
+## Checks that the files the EAC publishes still match their pinned SHA-256
+## checksums in eavs_manifest. The EAC re-releases revised versions of a cycle
+## for years after the first release, and eac.gov URLs churn; when either
 ## happens this script fails, which is the signal to update data-raw/manifest.R
 ## (version, release_date, source_url) and rebuild the manifest.
+##
+## This checks source_url only, and deliberately ignores mirror_url. The mirror
+## holds copies we uploaded ourselves, so it matches its pinned checksum by
+## construction and would report "ok" forever no matter what the EAC did. Asking
+## whether the upstream file changed is the entire point of this script; serving
+## users a file that works is eavs_download()'s job, and that one is right to
+## prefer the mirror.
 ##
 ## Run from the package root every few weeks:
 ##   Rscript data-raw/check_manifest.R
@@ -33,12 +40,11 @@ check_url <- function(url, sha256) {
 
 status <- character(nrow(eavs_manifest))
 for (i in seq_len(nrow(eavs_manifest))) {
-  urls <- c(eavs_manifest$mirror_url[i], eavs_manifest$source_url[i])
-  urls <- urls[!is.na(urls) & nzchar(urls)]
-  status[i] <- "unreachable"
-  for (url in urls) {
-    status[i] <- check_url(url, eavs_manifest$sha256[i])
-    if (status[i] == "ok") break
+  url <- eavs_manifest$source_url[i]
+  status[i] <- if (is.na(url) || !nzchar(url)) {
+    "no source_url"
+  } else {
+    check_url(url, eavs_manifest$sha256[i])
   }
   cat(sprintf("%-18s %s\n", label[i], status[i]))
 }

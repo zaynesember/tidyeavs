@@ -1,0 +1,41 @@
+concept,section,concept_label,epi_name,shipped
+fips_code,id,Jurisdiction FIPS code,,TRUE
+jurisdiction_name,id,Jurisdiction name,,TRUE
+state_abbr,id,State abbreviation,,TRUE
+state_name,id,State name,,TRUE
+reg_active,A,Active registered voters,totalActive,TRUE
+reg_confirmations_sent,A,Address confirmation notices sent,totalConfirmation,TRUE
+reg_eligible_total,A,Registered and eligible voters (total),registeredAndEligible,TRUE
+reg_forms_received,A,Registration forms received (all sources),totalForm,TRUE
+reg_inactive,A,Inactive registered voters,totalInactive,TRUE
+reg_new_valid,A,New valid registrations,form_ValidReg,TRUE
+reg_rejected,A,Registration forms invalid or rejected,form_Rejected,TRUE
+reg_removed_total,A,Voters removed from the rolls (total),totalRemoved,TRUE
+fwab_counted,B,Federal write-in absentee ballots counted,totalFwabCount,TRUE
+fwab_returned,B,Federal write-in absentee ballots returned,totalFwabReturn,TRUE
+uocava_counted,B,UOCAVA ballots counted,totalUocavaCount,TRUE
+uocava_rejected,B,UOCAVA ballots rejected,totalUocavaReject,TRUE
+uocava_returned,B,UOCAVA ballots returned for counting,totalAbsSubmit,TRUE
+uocava_transmitted,B,UOCAVA ballots transmitted,totalAbsTransmit,TRUE
+ballots_cured,C,Ballots cured after initial rejection,,TRUE
+drop_boxes_total,C,Ballot drop boxes,,TRUE
+mail_counted,C,Mail/absentee ballots counted,domAbs_Counted,TRUE
+mail_rejected,C,Mail/absentee ballots rejected,domAbs_Rejected,TRUE
+mail_returned,C,Mail/absentee ballots returned,byMail_Return,TRUE
+mail_spoiled,C,Mail/absentee ballots spoiled,byMail_Spoil,TRUE
+mail_transmitted,C,Mail/absentee ballots transmitted,totalByMail,TRUE
+mail_undeliverable,C,Mail/absentee ballots undeliverable,byMail_Undeliv,TRUE
+poll_worker_difficulty,D,Difficulty recruiting poll workers,,FALSE
+poll_workers_total,D,Poll workers (total),,TRUE
+polling_places_ed,D,Election Day polling places,,TRUE
+prov_counted_full,E,Provisional ballots counted in full,prov_FullCount,TRUE
+prov_counted_partial,E,Provisional ballots counted in part,prov_PartCount,TRUE
+prov_rejected,E,Provisional ballots rejected,prov_Rejected,TRUE
+prov_submitted,E,Provisional ballots submitted,totalProv,TRUE
+partic_all_mail,F,Voters: all-mail elections,partic_AllMail,TRUE
+partic_by_mail,F,Voters: by mail (vote-by-mail jurisdictions),partic_ByMail,TRUE
+partic_early_in_person,F,Voters: early in person,partic_Early,TRUE
+partic_in_person_ed,F,Voters: in person on Election Day,partic_PollPl,TRUE
+partic_provisional,F,Voters: provisional (credited),partic_Prov,TRUE
+partic_total,F,Total voter participation,totalPartic,TRUE
+partic_uocava,F,Voters: UOCAVA (absentee) ballot,partic_Abs,TRUE

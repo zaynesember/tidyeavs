@@ -1,10 +1,31 @@
 # tidyeavs — notes for Claude
 
-A tidy R package for the U.S. Election Assistance Commission's Election
+A tidy interface to the U.S. Election Assistance Commission's Election
 Administration and Voting Survey (EAVS). It downloads published EAVS files,
 decodes their missing-value codes, and harmonizes variable names across survey
 years so jurisdictions line up over time. Development happens on the `dev`
 branch.
+
+**Repo layout.** The R package lives in `r/`, not at the repo root — moved
+2026-07-29 to make room for a planned Python implementation in `py/`. Every
+path in this file that starts `data-raw/`, `R/`, `data/`, `man/`, or `tests/`
+is relative to `r/`, and R commands are run from `r/` (or given it as the `pkg`
+argument). At the root: `CLAUDE.md`, `README.md`, `.gitignore`, `.claude/`, and
+`metadata/`.
+
+`metadata/` is the shared, committed, language-neutral metadata (added
+2026-07-29); `metadata/README.md` is authoritative on it. Two files are
+hand-edited and canonical (`concepts.csv`, `crosswalk.csv`), two are generated
+by `r/data-raw/` scripts (`manifest.csv`, `jurisdictions.csv`), and
+`schema.json` carries the column types. **Read the string columns as strings:**
+a naive `pd.read_csv` turns Alaska's `0200000000` into `200000000` and every
+`county_fips` into a float. readr guesses right by luck, pandas does not.
+
+A macOS gotcha, in case the directory ever needs moving again: the filesystem
+is case-insensitive, so `r/` and the package's `R/` collide while they are
+siblings. Move the package into a temp-named directory first, then rename that
+to `r/`; a direct `git mv R r/` fails with "Invalid argument" after silently
+relocating any loose files already listed.
 
 ## Ground rules (read before writing anything)
 
@@ -45,8 +66,16 @@ with quirk flags).
 is private and Actions runs never start (billing-gated). Checks run locally
 instead: `devtools::check()` before committing, and
 `Rscript data-raw/check_manifest.R` every few weeks — it re-downloads every
-manifest URL and fails on checksum mismatch, i.e. the alarm for EAC
+`source_url` and fails on checksum mismatch, i.e. the alarm for EAC
 re-releases.
+
+That script checks `source_url` **only**, and must keep ignoring `mirror_url`
+(fixed 2026-07-29). The mirror will hold copies we uploaded, so it matches its
+pinned checksum by construction; consulting it first — which the script used to
+do — would have reported "ok" forever once `mirror_url` was populated, silencing
+the drift alarm at the exact moment it started to matter. Serving users a file
+that works is `eavs_download()`'s job, and that one is right to prefer the
+mirror. Two different questions, two different URL policies.
 
 Done: scaffold, cache/download, read, recode, manifest, dictionary, harmonize,
 items, load, jurisdictions, unit tests, README, manifest drift script.
@@ -56,7 +85,7 @@ mirror.
 
 ## How it fits together
 
-`R/` (one concern per file):
+`r/R/` (one concern per file):
 
 - `cache.R` — cache directory resolution and helpers. Location precedence:
   option `tidyeavs.cache_dir` → env `TIDYEAVS_CACHE_DIR` →
@@ -97,6 +126,11 @@ EPI's name), `note` (caveats, especially trap warnings), `confidence`
 UOCAVA, provisional, participation, polling places, drop boxes, and curing —
 **not** all ~400 columns. EAVS only for now; the Policy Survey isn't in the
 dictionary yet.
+
+Built from `metadata/concepts.csv` ⋈ `metadata/crosswalk.csv`, filtered to
+`shipped`. A 40th concept, `poll_worker_difficulty`, is curated there with
+`shipped = FALSE`: its codes are verified but its ordinal encoding changes form
+across years (see below), so it keeps its mapping without being exported.
 
 Raw EAVS data is never committed — it downloads on demand into the cache.
 
@@ -145,8 +179,11 @@ Raw EAVS data is never committed — it downloads on demand into the cache.
   (`Jurisdiction_Name`, `State_Full`, `State_Abbr`) — the dictionary's `id`
   rows handle this.
 - **`poll_worker_difficulty` is deferred.** It's an ordinal stored as text labels
-  in 2016/2018 but numeric codes later; harmonizing it needs care. It's excluded
-  from the shipped dictionary but kept in the source crosswalk for later.
+  in 2016/2018 but numeric codes later; harmonizing it needs care. Its verified
+  codes live in `metadata/crosswalk.csv` with `shipped = FALSE` in
+  `metadata/concepts.csv`, so the mapping survives without being exported. Code
+  path `D5` (2016) → `D9` (2018) → `D8` (2020+), and both `D5` and `D8a` mean
+  something else in other years — the `note` column spells it out.
 - **EAC re-releases revised versions** of a cycle for years afterward (quarterly
   errata). The manifest pins a version by checksum; when a new version drops,
   update `version`/`release_date`/`source_url` and re-run the build.
@@ -155,22 +192,27 @@ Raw EAVS data is never committed — it downloads on demand into the cache.
 
 ## Rebuilding the shipped data
 
-Source material (codebooks, the crosswalk candidate) lives in
-`data-raw/sources/`, which is **gitignored** — re-download via the scripts if
-absent.
+All of these are run from `r/`, and their relative paths assume it. Source
+material (codebooks, the crosswalk candidate) lives in `r/data-raw/sources/`,
+which is **gitignored** — re-download via the scripts if absent.
 
 - `Rscript data-raw/manifest.R` — downloads every file, computes byte size + SHA,
   writes `data/eavs_manifest.rda`. URLs verified 2026-07-18.
-- `Rscript data-raw/dictionary.R` — reads `data-raw/sources/crosswalk_candidate.csv`
-  (the verified cross-year codes) plus curated concept metadata, writes
-  `data/eavs_dictionary.rda`.
+- `Rscript data-raw/dictionary.R` — reads `../metadata/concepts.csv` and
+  `../metadata/crosswalk.csv` (the committed shared metadata), validates them,
+  writes `data/eavs_dictionary.rda`. No curated metadata lives in the script
+  any more; edit the CSVs instead.
+- `Rscript data-raw/schema.R` — writes `../metadata/schema.json`, the column
+  types for the four metadata CSVs. Re-run after adding, removing, or retyping
+  a column in any of them.
 
 - `Rscript data-raw/jurisdictions.R` — reads the raw files from the cache
   (downloading if absent), writes `data/eavs_jurisdictions.rda`. Its header
   comment is the fact list for jurisdiction quirks; it asserts exact published
   row counts per year.
-- `Rscript data-raw/check_manifest.R` — verifies the published files still
-  match the manifest checksums (the weekly CI drift check runs this).
+- `Rscript data-raw/check_manifest.R` — verifies the files the EAC still
+  publishes match the manifest checksums. Run it manually every few weeks;
+  there is no CI to run it.
 
 **Adding a survey year:** add its rows to `data-raw/manifest.R` (verify the URLs
 first), then extend the crosswalk — for each concept, look up the new year's code
@@ -182,12 +224,18 @@ cross-year series.
 
 ## Dev workflow
 
+Set the working directory to `r/` first — every one of these resolves the package
+from `getwd()`:
+
 ```r
+setwd("r")                    # from the repo root
 devtools::load_all()
 devtools::document()          # regenerate NAMESPACE + man/ after roxygen changes
 testthat::test_local()        # unit tests (offline; fixtures, no network)
 devtools::check(vignettes = FALSE)
 ```
+
+From a shell at the repo root, `devtools::check("r")` also works.
 
 Unit tests are network-free (they use fixture dictionaries and the bundled
 manifest). Real-data checks are run manually against live downloads; turning the
@@ -196,7 +244,7 @@ tracked task.
 
 Reference implementation for the pending data work (rate formulas,
 QA/consistency checks): MIT's Elections Performance Index pipeline at
-`/Users/zaynesember/MIT Git/2024-epi` — mine it for approaches, but keep
+`/Users/zaynesember/MEDSL_Git/2024-epi` — mine it for approaches, but keep
 tidyeavs corrections-free (the EPI *corrects* — e.g. it drops Kalawao and
 zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 
@@ -214,4 +262,16 @@ zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 - **Vignettes** — getting started; survey structure and what changed when;
   missingness; comparing across years safely.
 - **Data mirror** — upload the exact EAC files to GitHub releases and populate
-  `mirror_url` in the manifest.
+  `mirror_url` in the manifest. Mirror the **raw** published files, not a
+  harmonized derivative: it keeps provenance byte-exact and keeps the
+  download-and-decode pipeline intact, which is the point. This is also what
+  decouples "the EAC re-released a file" from "the package broke for everyone" —
+  today a re-release makes `eavs_download()` abort on checksum mismatch
+  (`download.R:113`) until the manifest is updated.
+- **Python package** in `py/` — a parallel implementation, not a binding; there's
+  no compiled core to wrap, and `rpy2` was rejected (it would make every Python
+  user install R). Roughly 500 lines: resolve a cache dir, fetch and verify a
+  checksum, read all-character, map negatives to `NA`, rename, concatenate. It
+  reads `metadata/` rather than shipping its own copy — see the type warning
+  there, because a naive `pd.read_csv` destroys FIPS leading zeros. Decide
+  pandas vs polars. No longer blocked.

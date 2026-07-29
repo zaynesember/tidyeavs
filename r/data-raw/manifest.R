@@ -99,3 +99,8 @@ eavs_manifest <- eavs_manifest[order(eavs_manifest$survey,
 
 save(eavs_manifest, file = "data/eavs_manifest.rda", compress = "xz")
 message("Wrote data/eavs_manifest.rda (", nrow(eavs_manifest), " files)")
+
+# Also write the shared copy any future Python package reads, so the pinned
+# catalog exists once rather than once per language. Generated, not hand-edited.
+readr::write_csv(eavs_manifest, "../metadata/manifest.csv", na = "")
+message("Wrote ../metadata/manifest.csv")
