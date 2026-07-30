@@ -46,8 +46,8 @@ relocating any loose files already listed.
 
 ## Current state
 
-`R CMD check` passes clean (0 errors / 0 warnings / 0 notes). Python: 79 unit
-tests plus 8 integration tests that need a populated cache. Both verified end to
+`R CMD check` passes clean (0 errors / 0 warnings / 0 notes). Python: 81 unit
+tests plus 26 that need a populated cache (integration + published-totals). Both verified end to
 end against the published record (row counts per year, mail-rejection rates
 ~0.8–1.5%, UOCAVA rejection, drop boxes appearing only 2022+).
 
@@ -242,6 +242,49 @@ rejected on top, i.e. it treats returned as returned-and-accepted; Utah's Davis
 County drops `partic_by_mail` 117,826 → 0, almost certainly a shift into
 `partic_all_mail`.
 
+## Published-totals tests (done 2026-07-30)
+
+The strongest external check available: `metadata/reference_totals.csv` holds
+figures quoted from the EAC's own Comprehensive Report with page provenance, and
+both suites assert against them (`py/tests/test_published_totals.py`,
+`r/tests/testthat/test-published-totals.R`). Skipped without a populated cache;
+the R one also skips under `R CMD check`, which runs from a built copy with no
+`metadata/` alongside, so run it via `testthat::test_local()`.
+
+Source: *EAVS 2024 Comprehensive Report*, Executive Summary pp. ii–v,
+<https://www.eac.gov/sites/default/files/2025-07/2024_EAVS_Report_508.pdf>. The
+report states figures as bounds ("over 158 million"), so the assertions are
+bounds. **Do not invent reference figures** — a fabricated "published total"
+would manufacture confidence in exactly the numbers this package exists to get
+right. Every row cites a page.
+
+Nine counts landed inside the report's bounds first try: `partic_total`
+158,211,780 (over 158M), `reg_active` 211,144,275 (more than 211M),
+`reg_forms_received` 103,512,313 (more than 103M), `reg_removed_total`
+21,298,175, `uocava_transmitted` 1,327,324, `fwab_returned` 28,140,
+`fwab_counted` 20,065, `poll_workers_total` 772,433, and `ballots_cured`
+317,191 = 54% of the 585,000 that entered curing ("more than half").
+
+**Rate denominators must be restricted to jurisdictions reporting both sides.**
+This is the difference between right and wrong, not a refinement. Over all rows
+`uocava_counted / uocava_returned` is **112%** for 2024; on the common subset it
+is **96.4%**, matching the report's "more than 96%". The cause is **Alabama: all
+67 counties report `uocava_counted` and none report `uocava_returned`**, so AL
+adds 132,849 to the numerator and nothing to the denominator. Both suites have a
+test that asserts the naive ratio exceeds 100%, so anyone "simplifying"
+`pair_rate` to a ratio of column sums fails loudly.
+
+The same principle fixes the voting-mode shares. The EAC's convention is
+`partic_total` **among jurisdictions reporting that mode**, which reproduces its
+Election Day figure exactly (37.40% against a published 37.4%). Dividing by the
+full `partic_total` gives 33.4%, because mode coverage is incomplete — the modes
+sum to 150.6M against a `partic_total` of 158.2M.
+
+Watch two traps when adding figures. `drop_boxes_total` counts **boxes** (14,958
+in 2024), not the "nearly 15 million ballots returned at drop boxes" the report
+mentions in the same breath. And `ballots_cured` is the count *cured*, not the
+585,000 that *entered* the cure process.
+
 ## Data model
 
 **`eavs_manifest`** — one row per downloadable file. Columns: `survey`
@@ -406,7 +449,6 @@ zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 
 ## Remaining work
 
-- **Integration tests** vs published EAC report totals.
 - **Vignettes** — getting started; survey structure and what changed when;
   missingness; comparing across years safely.
 - **Repo is public** as of 2026-07-30, which the mirror required (GitHub serves

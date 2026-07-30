@@ -23,6 +23,15 @@
       "section": "string",
       "note": "string"
     },
+    "reference_totals.csv": {
+      "year": "integer",
+      "metric": "string",
+      "relation": "string",
+      "value": "number",
+      "unit": "string",
+      "source": "string",
+      "note": "string"
+    },
     "manifest.csv": {
       "survey": "string",
       "year": "integer",

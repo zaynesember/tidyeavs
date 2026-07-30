@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from typing import Iterable
 
 import pandas as pd
@@ -34,7 +35,9 @@ def load(
     Cook County, Illinois is the recurring example — a state total can be badly
     off. :func:`tidyeavs.missing_status` is how you check coverage first.
     """
-    wanted = [years] if isinstance(years, int) else list(years)
+    # numbers.Integral covers numpy.int64, which pandas hands back and which
+    # is not an int.
+    wanted = [years] if isinstance(years, numbers.Integral) else list(years)
     frames = [
         harmonize(
             recode_missing(read(year, survey=survey, format=format, quiet=quiet)),

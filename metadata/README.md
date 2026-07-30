@@ -1,18 +1,19 @@
 # metadata
 
 The curated metadata that every tidyeavs implementation reads. It lives here, at
-the repo root, rather than inside `r/` so that the R package and any future
-Python package build from the same files. A corrected variable code lands in one
-place and both languages pick it up.
+the repo root, rather than inside `r/` or `py/`, so that both packages build from
+the same files. A corrected variable code lands in one place and both languages
+pick it up.
 
 None of this is EAVS data. Raw survey files are never committed; they download on
 demand into a local cache. What is here is the catalog of those files, the
-crosswalk that maps their variable codes to stable concept names, and the
-jurisdiction table.
+crosswalk that maps their variable codes to stable concept names, the
+jurisdiction table, the consistency checks, and the published figures the test
+suites check against.
 
 ## The files
 
-Three are hand-edited and are the authoritative source for what they describe:
+Four are hand-edited and are the authoritative source for what they describe:
 
 - **`concepts.csv`** — one row per concept: its `section` (`id`, or `A`–`F`), a
   plain-language `concept_label`, the MIT EPI's name for it where one exists, and
@@ -37,6 +38,22 @@ Three are hand-edited and are the authoritative source for what they describe:
   count. Checks are validated against the crosswalk at build time, so one naming
   a concept that does not exist fails rather than silently never firing.
 
+- **`reference_totals.csv`** — figures quoted from the EAC's own published
+  reports, which both test suites assert against. Each row carries the `source`
+  it came from, down to the report and page, and the `relation` (`gt` or `lt`)
+  the report's wording supports: the reports state bounds like "over 158 million"
+  rather than exact totals, so the tests assert bounds. Add rows only with a
+  citation you have actually read. A fabricated reference figure would
+  manufacture confidence in exactly the numbers this package exists to get right,
+  which is worse than having no check at all.
+
+  Note that a rate here is computed over only the jurisdictions reporting both
+  its numerator and its denominator. That is not a nicety. Summing
+  `uocava_counted` over every 2024 row and dividing by `uocava_returned` over
+  every row gives 112%, because all 67 Alabama counties report the numerator and
+  none report the denominator; on the common subset it is 96.4%, which is what
+  the EAC published.
+
 Two are generated and should not be hand-edited, since the next build overwrites
 them:
 
@@ -54,8 +71,9 @@ them:
 
 And one describes the rest:
 
-- **`schema.json`** — the column types for all four CSVs, written by
-  `r/data-raw/schema.R`.
+- **`schema.json`** — the column types for every CSV here, written by
+  `r/data-raw/schema.R`. Re-run it after adding, removing, or retyping a
+  column.
 
 ## Read the string columns as strings
 
@@ -80,8 +98,14 @@ uses an unrecognized section or confidence value fails there rather than
 downstream. Verify each year's code against that year's codebook label; codes are
 renumbered between cycles and are never safe to assume stable.
 
-**Adding a survey year.** The year list is asserted in three places, by design:
+**Adding a survey year.** The year list is asserted in four places, by design, so
+that a half-added year fails loudly rather than quietly producing a short panel:
 `crosswalk.csv` needs a row per concept for the new year, `r/data-raw/manifest.R`
-needs the new file's URLs, and `r/data-raw/jurisdictions.R` needs its published
-row count. Rebuild all three datasets, re-run `Rscript data-raw/schema.R`, and
-re-validate a cross-year series before trusting the result.
+needs the new file's URLs, `r/data-raw/jurisdictions.R` needs its published row
+count, and `PUBLISHED_ROWS` in `py/tests/test_integration.py` needs the same
+count. Rebuild the datasets, re-run `Rscript data-raw/schema.R`, and re-validate
+a cross-year series before trusting the result.
+
+Adding a cycle is also the moment to add that cycle's published figures to
+`reference_totals.csv` from its Comprehensive Report, which is what turns "the
+pipeline ran" into "the pipeline agrees with the EAC".

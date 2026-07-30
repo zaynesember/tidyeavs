@@ -80,6 +80,20 @@ def test_manifest_lookup_rejects_a_bad_survey():
         manifest_lookup(2024, survey="nonsense")
 
 
+def test_numpy_integers_are_accepted_as_a_single_year():
+    """A year out of pandas is a numpy.int64, which is not an int.
+
+    isinstance(np.int64(2024), int) is False, so a naive scalar check sends it
+    down the iterable branch and raises "numpy.int64 object is not iterable" —
+    which is what any caller doing load(df["year"].unique()[0]) would hit.
+    """
+    import numpy as np
+
+    assert manifest_lookup(np.int64(2024))["file_name"].item() == "eavs_2024_csv.zip"
+    assert len(manifest_lookup([np.int64(2022), np.int64(2024)])) == 2
+    assert len(tidyeavs.items(year=np.int64(2024))) == 39
+
+
 def test_manifest_lookup_returns_years_in_order():
     rows = manifest_lookup([2024, 2016])
     assert rows["year"].tolist() == [2016, 2024]

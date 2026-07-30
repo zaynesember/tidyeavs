@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from typing import Iterable
 
 import pandas as pd
@@ -34,7 +35,7 @@ def items(
     frame = get_dictionary(dictionary)
 
     if year is not None:
-        wanted = [year] if isinstance(year, int) else list(year)
+        wanted = [year] if isinstance(year, numbers.Integral) else list(year)
         frame = frame[frame["year"].isin(wanted)]
 
     if section is not None:

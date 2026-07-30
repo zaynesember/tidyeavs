@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import numbers
 import os
 import shutil
 import ssl
@@ -69,7 +70,9 @@ def manifest_lookup(
         raise ValueError(f"No {format!r} files are recorded for the {survey!r} survey.")
 
     if years is not None:
-        wanted = [years] if isinstance(years, int) else list(years)
+        # numbers.Integral, not int: a year straight out of pandas is a
+        # numpy.int64, which is not an int and would be treated as iterable.
+        wanted = [years] if isinstance(years, numbers.Integral) else list(years)
         missing = sorted(set(wanted) - set(rows["year"].dropna().astype(int)))
         if missing:
             available = sorted(rows["year"].dropna().astype(int).unique())
