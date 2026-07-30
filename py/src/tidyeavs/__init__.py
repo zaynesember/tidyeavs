@@ -24,6 +24,7 @@ Or the steps, if you want the intermediate stages::
 
 from __future__ import annotations
 
+from ._aggregate import aggregate
 from ._dictionary import items
 from ._metadata import (
     dictionary,
@@ -51,6 +52,7 @@ __all__ = [
     "recode_missing",
     "missing_status",
     "harmonize",
+    "aggregate",
     "items",
     # shared metadata
     "dictionary",

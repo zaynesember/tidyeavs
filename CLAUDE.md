@@ -63,7 +63,7 @@ Exported API (two tiers):
 - One-shot: `eavs_load(years)` → download + decode + harmonize into a tidy
   jurisdiction-year panel.
 - Steps: `eavs_download()`, `eavs_read()`, `eavs_recode_missing()`,
-  `eavs_missing_status()`, `eavs_harmonize()`, `eavs_items()`.
+  `eavs_missing_status()`, `eavs_harmonize()`, `eavs_aggregate()`, `eavs_items()`.
 - Cache: `eavs_cache_dir()`, `eavs_cache_list()`, `eavs_cache_clear()`.
 
 Shipped datasets: `eavs_manifest` (file catalog), `eavs_dictionary` (the
@@ -157,6 +157,39 @@ them, so exercise a cold cache after touching `download.py`):
 
 `test_ssl_context_has_a_usable_trust_store` guards the first offline. The second
 has no offline guard; it needs a live eac.gov fetch.
+
+## `eavs_aggregate` / `tidyeavs.aggregate` (done 2026-07-30)
+
+Rollups to state or county. Long output — one row per year, group, concept —
+because value + three counts across ~35 concepts is unusable wide. Verified
+identical between R and Python (3,885 × 10 over 2022+2024, 0 differing cells).
+
+**Coverage is reason-aware, and that was the whole design problem.** A single
+"did it report" count is wrong, because EAVS distinguishes *why* a value is
+absent and the codes mean opposite things:
+
+- `n_reported` — in `value`.
+- `n_missing` — real gaps: `not_available`, `other_missing`, `blank`.
+- `n_not_applicable` — `does_not_apply`, `valid_skip`. **Excluded from the
+  `coverage` denominator**, since nothing is missing.
+
+The numbers that forced this (2024): `prov_rejected` reads 79.9% coverage if you
+collapse the codes but 94.5% correctly, because 1,000 jurisdictions had no
+provisional ballots at all. `drop_boxes_total` swings 44.3% → 58.3%.
+`ballots_cured` has 3,643 genuine `not_available` and is the concept whose state
+totals deserve the least trust. Collapsing misreports in both directions.
+
+Reason-aware counts need the status, which recoding destroys, so pass
+`status=` — a `missing_status()` frame put through `harmonize()`, which works
+unchanged since harmonize only renames and selects. Without it every absence
+lands in `n_missing` and `coverage` is a lower bound; `coverage_exact` says which.
+
+Maine's statewide row and the territories are **included** (Zayne's call
+2026-07-30). Checked first: in 2024 no Maine county reports UOCAVA at all, so the
+statewide row is the state's only source and the EPI's "zero it out" would lose
+data rather than prevent double-counting. It does also carry `partic_total`
+6,589 against the counties' 835,858 — if county participation already counts
+UOCAVA voters that inflates Maine participation ~0.8%, which is unresolved.
 
 ## Data model
 
@@ -322,11 +355,7 @@ zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 
 ## Remaining work
 
-- **`eavs_aggregate`** — quirk-aware rollups to state (or county), handling the
-  Maine statewide row, Wisconsin codes, and territory exclusion, with loud
-  row-count assertions. Decide the API shape. `eavs_jurisdictions` now carries
-  the per-row type/flags this needs; join on `year` + `fips_code` (beware the
-  three shared WI codes — `shared_code` marks them).
+- **`eavs_flags`** — see below; the next feature.
 - **`eavs_flags`** — a tidy table of internal-consistency flags (subparts exceed
   a total, returned > transmitted, extreme year-over-year swings). Flags, never
   mutations.
