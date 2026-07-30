@@ -30,7 +30,11 @@ Two are generated and should not be hand-edited, since the next build overwrites
 them:
 
 - **`manifest.csv`** — written by `r/data-raw/manifest.R`. One row per
-  downloadable file, pinning a published EAC version by SHA-256.
+  downloadable file, pinning a published EAC version by SHA-256. `source_url` is
+  where the EAC publishes it; `mirror_url` is a byte-identical copy on a GitHub
+  release, which the packages try first so that an EAC re-release does not break
+  installed copies. Both are checked against the same checksum, so it does not
+  matter which one a download came from.
 - **`jurisdictions.csv`** — written by `r/data-raw/jurisdictions.R`. Every
   published jurisdiction row per year, with the type and quirk flags that the
   script's header comment explains. It is generated, but it crosses the language

@@ -9,10 +9,12 @@ any future Python implementation rather than kept inside this package. See
 
 - `manifest.R` — builds `eavs_manifest`, the catalog of downloadable EAVS
   files. Downloads each file from eac.gov, records its byte size and SHA-256,
-  and pins the current published version. Also writes
-  `../metadata/manifest.csv`. Re-run when the EAC releases a revised version
-  (update the version, release date, and URL first). Source URLs were verified
-  against eac.gov on 2026-07-18.
+  and pins the current published version. Also derives `mirror_url` from
+  `MIRROR_TAG`, checking that each release asset exists and leaving the column
+  empty for any that does not, and writes `../metadata/manifest.csv`. Re-run
+  when the EAC releases a revised version (update the version, release date, and
+  URL first, and upload the new file to the mirror release). Source URLs were
+  verified against eac.gov on 2026-07-18 and re-verified 2026-07-30.
 - `dictionary.R` — builds `eavs_dictionary` from `../metadata/concepts.csv` and
   `../metadata/crosswalk.csv`, validating them first: it fails on an incomplete
   concept-year grid, a concept present in one file and not the other, a

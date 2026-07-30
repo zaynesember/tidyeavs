@@ -140,15 +140,47 @@ published-record checks and is skipped unless a populated cache is present.
 the `dictionary()` function in the package namespace, so `tidyeavs.dictionary()`
 became "module object is not callable". Don't rename it back.
 
+**Two things the Python download path needs that R's doesn't** (found 2026-07-30,
+both only when actually hitting the network — the cached-file tests sailed past
+them, so exercise a cold cache after touching `download.py`):
+
+1. **A trust store.** The python.org macOS builds point OpenSSL at a `cert.pem`
+   that doesn't exist until the user runs `Install Certificates.command`, so
+   every download died with `CERTIFICATE_VERIFY_FAILED`.
+   `download.py:_ssl_context()` falls back to `certifi` when the default store is
+   unusable, and leaves a working one alone (Linux system stores may carry CAs
+   certifi lacks). `certifi` is a hard dependency for this reason.
+2. **A real User-Agent.** eac.gov answers urllib's default
+   `Python-urllib/3.x` with **403 Forbidden**. `_USER_AGENT` identifies the
+   package instead. R's curl was never affected, which is why this hid until the
+   mirror fallback was tested.
+
+`test_ssl_context_has_a_usable_trust_store` guards the first offline. The second
+has no offline guard; it needs a live eac.gov fetch.
+
 ## Data model
 
 **`eavs_manifest`** — one row per downloadable file. Columns: `survey`
 (`eavs`/`policy`), `year`, `format` (`csv`/`xlsx`), `version`, `release_date`,
 `file_name`, `bytes`, `sha256`, `source_url`, `mirror_url`. Covers EAVS and
 Policy Survey, 2016–2024. Each row pins one EAC version by checksum.
-`mirror_url` is `NA` for now (downloads come from eac.gov); the plan is to mirror
-the exact files as GitHub release assets and fill this in — the download code
-already prefers the mirror and falls back to eac.gov.
+**The mirror is live** (2026-07-30): all 18 `mirror_url` values point at assets on
+the `data-mirror-v1` GitHub release, and `eavs_download()` tries the mirror first,
+falling back to eac.gov. Verified both directions — a bogus `source_url` still
+downloads (mirror served it), and a bogus `mirror_url` still downloads (fallback
+worked). `mirror_url` is *derived* in `manifest.R` from `MIRROR_TAG` +
+`file_name`, not typed per row, and the build HEADs each asset and leaves the
+column empty for anything not yet uploaded, so the manifest never claims a mirror
+that isn't there. Upload before rebuilding:
+
+```
+gh release upload data-mirror-v1 <files...>     # existing release
+Rscript data-raw/manifest.R                      # then re-derive mirror_url
+```
+
+Cut a new tag (`data-mirror-v2`, and bump `MIRROR_TAG`) when the EAC re-releases
+a file whose `file_name` would collide with an existing asset; release asset
+names must be unique within a release.
 
 **`eavs_dictionary`** — the cross-year crosswalk, one row per concept per year.
 Columns: `concept` (stable snake_case), `concept_label`, `section` (`A`–`F`, or
@@ -301,13 +333,10 @@ zeroes Maine's statewide row; tidyeavs *flags* the same rows).
 - **Integration tests** vs published EAC report totals.
 - **Vignettes** — getting started; survey structure and what changed when;
   missingness; comparing across years safely.
-- **Data mirror** — upload the exact EAC files to GitHub releases and populate
-  `mirror_url` in the manifest. Mirror the **raw** published files, not a
-  harmonized derivative: it keeps provenance byte-exact and keeps the
-  download-and-decode pipeline intact, which is the point. This is also what
-  decouples "the EAC re-released a file" from "the package broke for everyone" —
-  today a re-release makes `eavs_download()` abort on checksum mismatch
-  (`download.R:113`) until the manifest is updated.
+- **Repo is public** as of 2026-07-30, which the mirror required (GitHub serves
+  private-repo release assets only to authenticated requests, and
+  `eavs_download()` fetches anonymously). It was needed anyway: the documented
+  `pak`/`pip` installs cannot work against a private repo.
 - **Python packaging polish** — the package works and is verified, but is not
   published. Not done: PyPI release, a lint/type setup (ruff + mypy), and
   `mirror_url` support exercised end to end (the code path exists but every

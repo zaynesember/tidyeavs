@@ -18,7 +18,10 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Topic :: Scientific/Engineering",
 ]
-dependencies = ["pandas>=2.0"]
+# certifi is a fallback trust store: the python.org macOS builds ship OpenSSL CA
+# paths that do not exist until the user runs Install Certificates.command, and
+# without a bundle every download fails to verify. See download.py:_ssl_context.
+dependencies = ["pandas>=2.0", "certifi"]
 
 [project.optional-dependencies]
 xlsx = ["openpyxl>=3.1"]

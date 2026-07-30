@@ -181,4 +181,10 @@ tidyeavs pins a specific version of each file by checksum, recorded in the share
 manifest, and reports which version you have. When the EAC issues a new version,
 the package is updated to match.
 
+So that a re-release doesn't break installed copies of the package in the
+meantime, byte-identical copies of the pinned files are also published as assets
+on a GitHub release, and `download()` tries those first before falling back to
+eac.gov. Both are verified against the same checksum, so the file you get is the
+same either way.
+
 If you use EAVS, cite the EAC as the source of the data.

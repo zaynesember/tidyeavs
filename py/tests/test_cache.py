@@ -85,6 +85,18 @@ def test_manifest_lookup_returns_years_in_order():
     assert rows["year"].tolist() == [2016, 2024]
 
 
+def test_ssl_context_has_a_usable_trust_store():
+    """Guards against CERTIFICATE_VERIFY_FAILED on every download.
+
+    The python.org macOS builds point OpenSSL at a cert.pem that does not exist
+    until the user runs Install Certificates.command, so a context built from the
+    defaults alone can end up trusting nothing.
+    """
+    from tidyeavs.download import _ssl_context
+
+    assert len(_ssl_context().get_ca_certs()) > 0
+
+
 def test_encoding_detection():
     assert detect_encoding("Autauga County".encode("utf-8")) == "utf-8"
     assert detect_encoding("Doña Ana".encode("utf-8")) == "utf-8"

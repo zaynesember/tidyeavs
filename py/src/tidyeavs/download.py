@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import os
 import shutil
+import ssl
 import tempfile
 import urllib.request
 from pathlib import Path
@@ -16,6 +19,37 @@ from ._constants import FORMATS, SURVEYS
 from .cache import cache_path
 
 _CHUNK = 1 << 20
+
+# eac.gov answers urllib's default "Python-urllib/3.x" User-Agent with a 403, so
+# identify the client honestly instead. R's curl is unaffected, which is why this
+# only ever bit the Python side.
+_USER_AGENT = "tidyeavs (+https://github.com/zaynesember/tidyeavs)"
+
+
+@functools.lru_cache(maxsize=1)
+def _ssl_context() -> ssl.SSLContext:
+    """A TLS context with a trust store that actually exists.
+
+    urllib verifies against OpenSSL's compiled-in CA paths, which on the
+    python.org macOS builds point at a ``cert.pem`` that is only created once the
+    bundled "Install Certificates.command" has been run. A library cannot assume
+    a user has run it — the symptom is every download failing with
+    CERTIFICATE_VERIFY_FAILED — so fall back to certifi's bundle when the default
+    store is missing. A working system store is left alone, since on Linux it may
+    carry CAs certifi does not.
+    """
+    paths = ssl.get_default_verify_paths()
+    usable = (paths.cafile and os.path.exists(paths.cafile)) or (
+        paths.capath and os.path.isdir(paths.capath)
+    )
+    if not usable:
+        try:
+            import certifi
+        except ImportError:
+            pass
+        else:
+            return ssl.create_default_context(cafile=certifi.where())
+    return ssl.create_default_context()
 
 
 def manifest_lookup(
@@ -117,7 +151,10 @@ def _download_one(row: pd.Series, overwrite: bool, quiet: bool) -> dict:
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(row["file_name"]).suffix) as tmp:
             tmp_path = Path(tmp.name)
         try:
-            with urllib.request.urlopen(url) as response, tmp_path.open("wb") as out:
+            request = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+            with urllib.request.urlopen(
+                request, context=_ssl_context()
+            ) as response, tmp_path.open("wb") as out:
                 shutil.copyfileobj(response, out, _CHUNK)
         except Exception as exc:  # noqa: BLE001 - report and try the next URL
             errors.append(f"{url}: {exc}")

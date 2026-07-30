@@ -10,9 +10,22 @@
 ## EAVS CSV and the 2018/2020 Policy Survey CSVs are plain .csv. The file
 ## extension is taken from the source URL, so both are handled.
 ##
+## The mirror: every file is also published as an asset on a GitHub release, so
+## eavs_download() has a source that does not move when the EAC re-releases a
+## cycle. mirror_url is derived from MIRROR_TAG and file_name rather than typed
+## out per row, so a new survey year picks one up automatically. Upload the files
+## to the release *before* running this script, since it checks each mirror URL
+## and leaves mirror_url empty for any asset that is not there yet:
+##
+##   gh release create <tag> <files...> --target dev --title "..." --notes "..."
+##   gh release upload <tag> <files...>          # to add to an existing release
+##
 ## Run from the package root:  Rscript data-raw/manifest.R
 
 library(tibble)
+
+MIRROR_TAG <- "data-mirror-v1"
+MIRROR_BASE <- "https://github.com/zaynesember/tidyeavs/releases/download"
 
 files <- tribble(
   ~survey,  ~year, ~format, ~version, ~release_date, ~source_url,
@@ -81,6 +94,24 @@ for (i in seq_len(nrow(files))) {
   bytes[i] <- file.info(dest)$size
 }
 
+# Mirror URLs, kept honest: a manifest that claims a mirror which is not there
+# would send every user through a pointless 404 before the eac.gov fallback, so
+# check each asset exists and record only the ones that do.
+mirror_url <- sprintf("%s/%s/%s", MIRROR_BASE, MIRROR_TAG, files$file_name)
+reachable <- vapply(mirror_url, function(url) {
+  h <- curl::new_handle(nobody = TRUE, followlocation = TRUE)
+  status <- tryCatch(curl::curl_fetch_memory(url, handle = h)$status_code,
+                     error = function(e) NA_integer_)
+  isTRUE(status == 200L)
+}, logical(1))
+if (!all(reachable)) {
+  message("No mirror asset yet for: ",
+          paste(files$file_name[!reachable], collapse = ", "),
+          "\n  Upload them to the '", MIRROR_TAG,
+          "' release and re-run; mirror_url is left empty for now.")
+  mirror_url[!reachable] <- NA_character_
+}
+
 eavs_manifest <- tibble::tibble(
   survey = files$survey,
   year = files$year,
@@ -91,7 +122,7 @@ eavs_manifest <- tibble::tibble(
   bytes = bytes,
   sha256 = sha256,
   source_url = files$source_url,
-  mirror_url = NA_character_
+  mirror_url = mirror_url
 )
 eavs_manifest <- eavs_manifest[order(eavs_manifest$survey,
                                      eavs_manifest$year,
