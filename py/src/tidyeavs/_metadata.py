@@ -107,6 +107,20 @@ def read_metadata_csv(name: str) -> pd.DataFrame:
 
 
 @functools.lru_cache(maxsize=1)
+def checks() -> pd.DataFrame:
+    """The internal-consistency checks :func:`tidyeavs.flags` runs.
+
+    Every check has one shape: the concepts in ``parts`` should not sum past
+    ``total``. ``parts`` arrives as a semicolon-separated string in the CSV, so
+    the file stays a flat table, and is split into a list here.
+    """
+    frame = read_metadata_csv("checks.csv")
+    frame = frame.copy()
+    frame["parts"] = frame["parts"].str.split(";")
+    return frame.sort_values(["section", "check"]).reset_index(drop=True)
+
+
+@functools.lru_cache(maxsize=1)
 def manifest() -> pd.DataFrame:
     """The catalog of downloadable EAVS files, one row per file."""
     return read_metadata_csv("manifest.csv")
@@ -163,5 +177,5 @@ def dictionary() -> pd.DataFrame:
 
 
 def _clear_caches() -> None:
-    for fn in (schema, manifest, jurisdictions, dictionary):
+    for fn in (schema, manifest, jurisdictions, dictionary, checks):
         fn.cache_clear()

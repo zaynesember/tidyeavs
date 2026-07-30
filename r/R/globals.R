@@ -3,5 +3,6 @@
 utils::globalVariables(c(
   "eavs_manifest",
   "eavs_dictionary",
-  "eavs_jurisdictions"
+  "eavs_jurisdictions",
+  "eavs_checks"
 ))

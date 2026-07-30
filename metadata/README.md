@@ -12,7 +12,7 @@ jurisdiction table.
 
 ## The files
 
-Two are hand-edited and are the authoritative source for what they describe:
+Three are hand-edited and are the authoritative source for what they describe:
 
 - **`concepts.csv`** — one row per concept: its `section` (`id`, or `A`–`F`), a
   plain-language `concept_label`, the MIT EPI's name for it where one exists, and
@@ -25,6 +25,17 @@ Two are hand-edited and are the authoritative source for what they describe:
   and any trap warning in `note`. A blank `code` means the item was not collected
   that year, which is different from an absent row and is why the file is a
   complete concept-year grid.
+
+- **`checks.csv`** — one row per internal-consistency check that `eavs_flags()` /
+  `tidyeavs.flags()` runs. Every check has the same shape: the concepts listed in
+  `parts` should not sum past `total`, which covers both simple orderings (one
+  part, mail ballots returned against transmitted) and subparts against a total
+  (several, counted plus rejected against returned). `parts` is
+  semicolon-separated so the file stays a flat table; both languages split it on
+  read. `note` records what an excess usually means for that check, which is
+  normally a difference in reporting convention rather than a discrepancy in the
+  count. Checks are validated against the crosswalk at build time, so one naming
+  a concept that does not exist fails rather than silently never firing.
 
 Two are generated and should not be hand-edited, since the next build overwrites
 them:

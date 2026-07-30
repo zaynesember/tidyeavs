@@ -25,6 +25,8 @@ concepts <- readr::read_csv("../metadata/concepts.csv",
                             col_types = readr::cols(.default = "c"))
 crosswalk <- readr::read_csv("../metadata/crosswalk.csv",
                              col_types = readr::cols(.default = "c"))
+checks <- readr::read_csv("../metadata/checks.csv",
+                          col_types = readr::cols(.default = "c"))
 concepts_types <- c(
   concept = "string", section = "string", concept_label = "string",
   epi_name = "string", shipped = "boolean"
@@ -33,9 +35,16 @@ crosswalk_types <- c(
   concept = "string", year = "integer", code = "string",
   codebook_label = "string", confidence = "string", note = "string"
 )
+# `parts` is a semicolon-separated concept list, kept as one string in the CSV so
+# the file stays a flat table; both languages split it on read.
+checks_types <- c(
+  check = "string", total = "string", parts = "string", section = "string",
+  note = "string"
+)
 stopifnot(
   setequal(names(concepts), names(concepts_types)),
-  setequal(names(crosswalk), names(crosswalk_types))
+  setequal(names(crosswalk), names(crosswalk_types)),
+  setequal(names(checks), names(checks_types))
 )
 
 # The two generated files: take the types from the authoritative R objects.
@@ -60,15 +69,17 @@ json <- paste0(
   '  "files": {\n',
   paste0(
     sprintf('    "%s": %s',
-            c("concepts.csv", "crosswalk.csv", "manifest.csv", "jurisdictions.csv"),
+            c("concepts.csv", "crosswalk.csv", "checks.csv", "manifest.csv",
+              "jurisdictions.csv"),
             c(as_obj(concepts_types), as_obj(crosswalk_types),
-              as_obj(manifest_types), as_obj(jurisdictions_types))),
+              as_obj(checks_types), as_obj(manifest_types),
+              as_obj(jurisdictions_types))),
     collapse = ",\n"
   ),
   "\n  }\n}\n"
 )
 
 writeLines(json, "../metadata/schema.json")
-message("Wrote ../metadata/schema.json (4 files, ",
-        length(concepts_types) + length(crosswalk_types) +
+message("Wrote ../metadata/schema.json (5 files, ",
+        length(concepts_types) + length(crosswalk_types) + length(checks_types) +
           length(manifest_types) + length(jurisdictions_types), " columns)")

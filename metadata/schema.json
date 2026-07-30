@@ -16,6 +16,13 @@
       "confidence": "string",
       "note": "string"
     },
+    "checks.csv": {
+      "check": "string",
+      "total": "string",
+      "parts": "string",
+      "section": "string",
+      "note": "string"
+    },
     "manifest.csv": {
       "survey": "string",
       "year": "integer",

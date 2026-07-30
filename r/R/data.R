@@ -112,3 +112,27 @@
 #'   `data-raw/jurisdictions.R`, which records the structural facts and the
 #'   years they were verified against.
 "eavs_jurisdictions"
+
+#' Internal-consistency checks
+#'
+#' The checks [eavs_flags()] runs. Every check has one shape: the concepts in
+#' `parts` should not sum past `total`, which covers both simple orderings (one
+#' part, e.g. mail ballots returned against transmitted) and subparts against a
+#' total (several, e.g. counted plus rejected against returned).
+#'
+#' These encode arithmetic expectations, not judgments. A check firing means two
+#' reported numbers do not reconcile; `note` records the ordinary explanations
+#' for that particular check, most of which are differences in reporting
+#' convention rather than discrepancies in the count.
+#'
+#' @format A tibble with one row per check:
+#' \describe{
+#'   \item{check}{Check name, stable snake_case.}
+#'   \item{total}{Concept the parts are compared against.}
+#'   \item{parts}{Character vector of concepts whose sum is compared.}
+#'   \item{section}{Survey section the check sits in (`"A"`–`"F"`).}
+#'   \item{note}{What an excess usually means for this check.}
+#' }
+#' @source Built from `metadata/checks.csv`, the committed definition shared with
+#'   the Python implementation. See `data-raw/checks.R`.
+"eavs_checks"

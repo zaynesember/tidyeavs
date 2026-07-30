@@ -1,0 +1,10 @@
+check,total,parts,section,note
+mail_returned_le_transmitted,mail_transmitted,mail_returned,C,"More mail ballots returned than transmitted. Often a timing or scope difference: some jurisdictions count transmissions in an earlier reporting period, or report UOCAVA transmissions separately from the domestic total."
+mail_disposition_le_returned,mail_returned,mail_counted;mail_rejected,C,"Counted plus rejected exceeds returned. Undeliverable and spoiled ballots are reported separately, so they do not explain an excess here."
+uocava_returned_le_transmitted,uocava_transmitted,uocava_returned,B,"More UOCAVA ballots returned than transmitted. Ballots transmitted before the reporting window opens are a common explanation."
+uocava_disposition_le_returned,uocava_returned,uocava_counted;uocava_rejected,B,"Counted plus rejected exceeds UOCAVA ballots returned. Note the B18a/B24a renumbering: verify the year's codes before reading much into this one."
+fwab_counted_le_returned,fwab_returned,fwab_counted,B,Federal write-in absentee ballots counted exceeds those returned.
+prov_disposition_le_submitted,prov_submitted,prov_counted_full;prov_counted_partial;prov_rejected,E,"Provisional ballots counted in full, counted in part, and rejected together exceed those submitted."
+reg_active_le_total,reg_eligible_total,reg_active,A,"Active registrations exceed total registered and eligible voters. States differ in whether the total includes inactive registrants, so compare against reg_inactive before drawing a conclusion."
+reg_disposition_le_forms,reg_forms_received,reg_new_valid;reg_rejected,A,"New valid registrations plus rejected forms exceed forms received. Duplicate and update forms are counted differently across jurisdictions, which routinely produces an excess here."
+partic_modes_le_total,partic_total,partic_in_person_ed;partic_uocava;partic_by_mail;partic_provisional;partic_early_in_person;partic_all_mail,F,"Participation by mode sums to more than total participation. Mode categories overlap in some states, notably by-mail against all-mail elections, so an excess here often reflects a reporting convention rather than a discrepancy in the count."

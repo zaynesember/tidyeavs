@@ -26,7 +26,9 @@ from __future__ import annotations
 
 from ._aggregate import aggregate
 from ._dictionary import items
+from ._flags import flags
 from ._metadata import (
+    checks,
     dictionary,
     jurisdictions,
     manifest,
@@ -53,9 +55,11 @@ __all__ = [
     "missing_status",
     "harmonize",
     "aggregate",
+    "flags",
     "items",
     # shared metadata
     "dictionary",
+    "checks",
     "manifest",
     "jurisdictions",
     "metadata_dir",
