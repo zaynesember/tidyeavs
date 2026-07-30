@@ -1,0 +1,197 @@
+---
+title: "Getting started: a state-level mail rejection rate"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started: a state-level mail rejection rate}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+This walks one real task end to end: what share of mail ballots were rejected,
+by state, in each survey year. It is a common first EAVS analysis, and it has a
+trap in it that produces a plausible-looking wrong answer. That trap is the
+reason this vignette leads with it rather than saving it for a caveats section.
+
+
+``` r
+library(tidyeavs)
+
+panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024), quiet = TRUE)
+dim(panel)
+#> [1] 32308    43
+```
+
+One row per jurisdiction per year, with harmonized column names. The first call
+for a year downloads the published file and caches it; later calls read the
+cache.
+
+## Finding the right columns
+
+EAVS variable codes are renumbered between cycles, so the concept names are what
+you work with. `eavs_items()` searches the crosswalk both ways:
+
+
+``` r
+eavs_items("mail_rejected")[, c("year", "code", "codebook_label")]
+#> # A tibble: 5 × 3
+#>    year code  codebook_label                          
+#>   <int> <chr> <chr>                                   
+#> 1  2016 C4b   C4b. Absentee ballots returned: rejected
+#> 2  2018 C4a   By-mail Ballots Rejected: Total         
+#> 3  2020 C4a   C4a By-mail Rejected Total              
+#> 4  2022 C9a   C9a Mail Rejected Total                 
+#> 5  2024 C9a   C9a Total Mail Ballots Rejected
+```
+
+The code moves from `C4b` in 2016 to `C4a` in 2018 and 2020, then to `C9a` in
+2022 and 2024. Worse, `C4a` means "counted" in 2016 and "drop boxes" in 2022, so
+anyone tracking this item by its code across years gets three different
+quantities. The `note` column spells out each trap:
+
+
+``` r
+cat(eavs_items("mail_rejected")$note[1])
+#> 2016 uses C4b='Absentee ballots returned: rejected'. TRAP: C4b-2018+ ='By-mail Rejected: Deadline' (a rejection REASON, not the total).
+```
+
+## The rate
+
+Here is the part worth slowing down for. The obvious approach is to sum
+rejections by state, sum returns by state, and divide. That is wrong, and it
+fails quietly:
+
+
+``` r
+naive <- aggregate(cbind(mail_rejected, mail_returned) ~ state_abbr,
+                   data = subset(panel, year == 2022), FUN = sum, na.rm = TRUE,
+                   na.action = na.pass)
+naive$rate <- 100 * naive$mail_rejected / naive$mail_returned
+naive[naive$state_abbr %in% c("AL", "GA", "VI"), ]
+#>    state_abbr mail_rejected mail_returned     rate
+#> 2          AL             0         24676 0.000000
+#> 12         GA          3785        252272 1.500365
+#> 50         VI             0           463 0.000000
+```
+
+Alabama and the Virgin Islands both read exactly 0.0%, and only one of them
+means it. No Alabama jurisdiction reported rejections that year, so its
+numerator is a sum of nothing, and summing nothing gives zero rather than
+"unknown". The Virgin Islands really did report, and really did reject none of
+their 463 returned ballots. The two are indistinguishable in that table, which
+is the problem: a phantom zero and a real zero print identically.
+
+Sometimes the same problem announces itself instead. In 2024 both Alabama and
+Connecticut report rejections but no returns, so the division is by zero:
+
+
+``` r
+n24 <- aggregate(cbind(mail_rejected, mail_returned) ~ state_abbr,
+                 data = subset(panel, year == 2024), FUN = sum, na.rm = TRUE,
+                 na.action = na.pass)
+n24$rate <- 100 * n24$mail_rejected / n24$mail_returned
+n24[n24$state_abbr %in% c("AL", "CT"), ]
+#>   state_abbr mail_rejected mail_returned rate
+#> 2         AL          1779             0  Inf
+#> 8         CT          2642             0  Inf
+```
+
+An `Inf` at least gets noticed. The 0.0% is the one that ends up in a table.
+Both come from the same cause: a state can be missing either side of the pair,
+and the two sums are computed over different sets of jurisdictions.
+
+`eavs_rate()` restricts each rate to the jurisdictions that reported both sides,
+which is how the EAC computes its own published rates:
+
+
+``` r
+rates <- eavs_rate(panel, "mail_rejected", "mail_returned")
+head(rates[rates$year == 2022, c("state_abbr", "rate", "n_both", "den_share")], 4)
+#> # A tibble: 4 × 4
+#>   state_abbr    rate n_both den_share
+#>   <chr>        <dbl>  <int>     <dbl>
+#> 1 AK          0.0137      1     1    
+#> 2 AL         NA           0     0    
+#> 3 AR          0.0706     67     0.957
+#> 4 AS         NA           0    NA
+```
+
+And the two zeros separate:
+
+
+``` r
+rates[rates$year == 2022 & rates$state_abbr %in% c("AL", "VI"),
+      c("state_abbr", "rate", "n_both", "n_num_only", "n_den_only")]
+#> # A tibble: 2 × 5
+#>   state_abbr  rate n_both n_num_only n_den_only
+#>   <chr>      <dbl>  <int>      <int>      <int>
+#> 1 AL            NA      0          0         67
+#> 2 VI             0      1          0          0
+```
+
+Alabama gets no rate at all, and `n_den_only` says why: 67 jurisdictions
+reported a denominator with no numerator to divide into it. The Virgin Islands
+keep their zero, earned by the one jurisdiction that answered both questions.
+Same printed number in the naive table, different facts, and now visibly so.
+
+## Two columns to read before quoting a number
+
+`n_both` is how many jurisdictions stand behind the rate. `den_share` is how
+much of the state's reported returned ballots those jurisdictions hold. Both
+matter, because a rate computed from two jurisdictions prints exactly like one
+computed from two hundred:
+
+
+``` r
+thin <- rates[rates$year == 2022 & rates$den_share < 0.10,
+              c("state_abbr", "rate", "n_both", "den_share")]
+thin[order(thin$den_share), ]
+#> # A tibble: 5 × 4
+#>   state_abbr     rate n_both den_share
+#>   <chr>         <dbl>  <int>     <dbl>
+#> 1 AL         NA            0   0      
+#> 2 ID          0.00211      2   0.00369
+#> 3 <NA>       NA           NA  NA      
+#> 4 <NA>       NA           NA  NA      
+#> 5 <NA>       NA           NA  NA
+```
+
+Idaho's 2022 rate rests on two jurisdictions holding well under 1% of the
+state's mail ballots. The number is arithmetically correct and analytically
+useless. This is the single most valuable habit when working with EAVS: the rate
+and its support are two different facts, and you need both.
+
+## A national series
+
+To pool groups, add up the numerator and denominator and divide once. Averaging
+the state rates would weight Wyoming like California:
+
+
+``` r
+national <- aggregate(cbind(num_value, den_value) ~ year, data = rates, FUN = sum)
+national$pct <- round(100 * national$num_value / national$den_value, 2)
+national[, c("year", "pct")]
+#>   year  pct
+#> 1 2016 0.96
+#> 2 2018 1.42
+#> 3 2020 0.80
+#> 4 2022 1.52
+#> 5 2024 1.21
+```
+
+Around 1% in most cycles, dipping in 2020 when a record volume of mail ballots
+was returned. That matches the published record, which is the point of checking.
+
+## Before you publish
+
+Two more steps, each with its own vignette. Run `eavs_flags()` on any panel
+spanning years: it catches sums that do not reconcile, implausible swings, and
+verified statewide reporting anomalies that no arithmetic check can see. And
+pass a status frame to `eavs_aggregate()` when you want totals rather than
+rates, so you can see how much of each state actually reported.
+
+For this analysis specifically, the states worth a footnote are the ones where
+`n_both` is small, `den_share` is low, or `rate` is `NA`. Those are visible in
+the output above rather than something you have to know in advance, which is the
+whole reason the columns are there.

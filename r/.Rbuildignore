@@ -1,0 +1,11 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^data-raw$
+^README\.Rmd$
+^cran-comments\.md$
+^doc$
+^Meta$
+^scratch$
+^LICENSE\.md$
+^vignettes/.*\.Rmd\.orig$
+^vignettes/precompute\.R$

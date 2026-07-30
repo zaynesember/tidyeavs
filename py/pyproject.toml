@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tidyeavs"
+version = "0.0.1.dev0"
+description = "A tidy interface to the EAC's Election Administration and Voting Survey (EAVS)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Zayne Sember" }]
+keywords = ["elections", "EAVS", "election administration", "voting", "EAC"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering",
+]
+# certifi is a fallback trust store: the python.org macOS builds ship OpenSSL CA
+# paths that do not exist until the user runs Install Certificates.command, and
+# without a bundle every download fails to verify. See download.py:_ssl_context.
+dependencies = ["pandas>=2.0", "certifi"]
+
+[project.optional-dependencies]
+xlsx = ["openpyxl>=3.1"]
+test = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/zaynesember/tidyeavs"
+Issues = "https://github.com/zaynesember/tidyeavs/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tidyeavs"]
+
+# The curated metadata lives at the repo root, shared with the R package, rather
+# than inside this project. Copy it into the wheel so an installed package is
+# self-contained; _metadata.py looks for the packaged copy first and falls back
+# to walking up to the repo's metadata/ when running from a checkout.
+[tool.hatch.build.targets.wheel.force-include]
+"../metadata/concepts.csv" = "tidyeavs/metadata/concepts.csv"
+"../metadata/crosswalk.csv" = "tidyeavs/metadata/crosswalk.csv"
+"../metadata/checks.csv" = "tidyeavs/metadata/checks.csv"
+"../metadata/known_anomalies.csv" = "tidyeavs/metadata/known_anomalies.csv"
+"../metadata/manifest.csv" = "tidyeavs/metadata/manifest.csv"
+"../metadata/jurisdictions.csv" = "tidyeavs/metadata/jurisdictions.csv"
+"../metadata/schema.json" = "tidyeavs/metadata/schema.json"
+"../LICENSE" = "tidyeavs/LICENSE"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "pyproject.toml"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"../metadata" = "metadata"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Run the suite straight from a checkout, without needing an editable install.
+pythonpath = ["src"]

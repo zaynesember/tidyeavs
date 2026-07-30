@@ -1,0 +1,167 @@
+---
+title: "Survey structure, jurisdictions, and the other 500 columns"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Survey structure, jurisdictions, and the other 500 columns}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(width = 84)
+```
+
+Three things about EAVS surprise people: variable codes are not stable across
+years, "jurisdiction" does not mean county, and the package ships a curated
+subset of the survey rather than all of it. This vignette covers each, and how to
+work with the parts that are not curated.
+
+```{r load}
+library(tidyeavs)
+```
+
+## Codes move, and reuse is the real hazard
+
+EAVS is organized in sections A through F: registration, UOCAVA, mail ballots,
+polling places and precincts, provisional ballots, and participation. Within a
+section, items are numbered, and the numbering is revised between cycles.
+
+Renumbering on its own would be a nuisance. What makes it dangerous is that
+retired codes get reused for different items. The precinct count is the worst
+case in the shipped set:
+
+```{r precincts}
+eavs_items("precincts_total")[, c("year", "code", "codebook_label")]
+```
+
+The code is `D1a` in 2016, wanders to `D3a` and then `D2a`, and returns to `D1a`
+in 2022. Checking only the first and last cycle suggests a stable code. In
+between, `D1a` means votes cast in 2018 and Election Day poll-place voters in
+2020, so a series pulled by code would silently mix three different quantities.
+
+The `note` column exists for exactly this:
+
+```{r precinct-note}
+cat(strwrap(eavs_items("precincts_total")$note[1], 78), sep = "\n")
+```
+
+Search by code when you have a codebook in front of you, or by concept when you
+know what you want:
+
+```{r items-search}
+eavs_items("C9a")[, c("concept", "year", "code")]
+```
+
+## Confidence, and where to be careful
+
+Every mapping carries a rating. Anything below `high` means the definition
+shifted and the `note` explains how:
+
+```{r confidence}
+d <- eavs_dictionary
+table(d$confidence)
+subset(d, confidence != "high", select = c("concept", "year", "code"))
+```
+
+## Jurisdictions are not counties
+
+The unit is whatever files the survey, which varies by state. Wisconsin reports
+roughly 1,850 municipalities, New England reports towns, Alaska and the
+territories file one row each, and Maine files an extra statewide row carrying
+only its UOCAVA totals:
+
+```{r jurisdictions}
+j <- subset(eavs_jurisdictions, year == 2024)
+sort(table(j$type), decreasing = TRUE)
+```
+
+Two consequences worth planning around. County rollups drop anything whose
+published code embeds no county, and say so:
+
+```{r county}
+panel <- eavs_load(2024, quiet = TRUE)
+cty <- eavs_aggregate(panel, by = "county", concepts = "partic_total")
+nrow(cty)
+```
+
+Wisconsin is excluded even though its county is printed in every jurisdiction
+name, and `eavs_jurisdictions` parses it into `county_name`. The reason is that
+the municipalities straddling county lines include the City of Milwaukee:
+
+```{r wisconsin}
+wi <- subset(eavs_jurisdictions, year == 2024 & state_abbr == "WI")
+sum(is.na(wi$county_name))
+grep("MILWAUKEE|APPLETON", wi$jurisdiction_name[is.na(wi$county_name)], value = TRUE)
+```
+
+A Wisconsin county rollup would therefore be missing the state's largest city,
+which is worse than not offering one. Use `county_name` for filtering and joins;
+do not build county totals from it without deciding what to do about those rows.
+
+## Who counts as a state
+
+State-level output includes the territories and the District of Columbia,
+because they file real data. `entity_type` makes a 50-state analysis one filter:
+
+```{r entity}
+agg <- eavs_aggregate(panel, concepts = "partic_total")
+table(agg$entity_type)
+subset(agg, entity_type != "state", select = c("state_abbr", "entity_type", "value"))
+```
+
+Puerto Rico is absent in midterm years, which will look like missing data in a
+panel unless you know to expect it.
+
+## The other 500 columns
+
+The dictionary covers around 40 concepts, not the roughly 540 columns each file
+carries. That is a curation choice, not a restriction: everything else is still
+available, and the decoding that makes EAVS usable applies to all of it.
+
+```{r raw}
+raw <- eavs_read(2024, quiet = TRUE)
+dim(raw)
+decoded <- eavs_recode_missing(raw)
+sum(vapply(decoded, is.numeric, logical(1)))
+```
+
+`eavs_read()` returns the file exactly as published, every column as text, so
+FIPS codes keep their leading zeros. `eavs_recode_missing()` then decodes
+sentinels across every numeric item, whether or not it is in the crosswalk.
+Mail rejection reasons are a good example of something researchers often want:
+
+```{r reasons}
+reasons <- c(C9b = "late", C9c = "missing voter signature",
+             C9e = "non-matching signature")
+sapply(names(reasons), function(cd) sum(decoded[[cd]], na.rm = TRUE))
+```
+
+`eavs_missing_status()` works on these too, and once a column is attached to a
+harmonized panel, `eavs_aggregate()` and `eavs_rate()` treat it like any other
+numeric column:
+
+```{r attach}
+tidy <- eavs_harmonize(decoded, year = 2024)
+tidy$rejected_late <- decoded$C9b[match(tidy$fips_code, raw$FIPSCode)]
+head(eavs_rate(tidy, "rejected_late", "mail_rejected")[, c("state_abbr", "rate", "n_both")], 3)
+```
+
+What you do not get is the cross-year work. You have to find each year's code
+yourself, and the traps above are live: mail rejection reasons are `C4b`–`C4l` in
+2018 and 2020 but `C9b`–`C9l` from 2022, and `C4b` means a drop-box count in the
+later years. The 2016 file is a bigger step, with different column naming
+throughout:
+
+```{r naming}
+c(cols_2016 = ncol(eavs_read(2016, quiet = TRUE)), cols_2024 = ncol(raw))
+grep("^A2", names(eavs_read(2016, quiet = TRUE)), value = TRUE)
+grep("^A2", names(raw), value = TRUE)
+```
+
+Same-day registration is `A2a` from 2018 on, but in 2016 the item is `A4a`, and
+`A4a` in later years means mail registration forms. If you are doing single-year
+work on an uncurated item, the package already handles the hard part. If you are
+building a cross-year series from one, verify each year's code against that
+year's codebook, and consider whether the concept belongs in the crosswalk
+instead.

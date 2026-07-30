@@ -1,0 +1,237 @@
+---
+title: "Survey structure, jurisdictions, and the other 500 columns"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Survey structure, jurisdictions, and the other 500 columns}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+Three things about EAVS surprise people: variable codes are not stable across
+years, "jurisdiction" does not mean county, and the package ships a curated
+subset of the survey rather than all of it. This vignette covers each, and how to
+work with the parts that are not curated.
+
+
+``` r
+library(tidyeavs)
+```
+
+## Codes move, and reuse is the real hazard
+
+EAVS is organized in sections A through F: registration, UOCAVA, mail ballots,
+polling places and precincts, provisional ballots, and participation. Within a
+section, items are numbered, and the numbering is revised between cycles.
+
+Renumbering on its own would be a nuisance. What makes it dangerous is that
+retired codes get reused for different items. The precinct count is the worst
+case in the shipped set:
+
+
+``` r
+eavs_items("precincts_total")[, c("year", "code", "codebook_label")]
+#> # A tibble: 5 × 3
+#>    year code  codebook_label            
+#>   <int> <chr> <chr>                     
+#> 1  2016 D1a   D1a. Total Precincts      
+#> 2  2018 D3a   Number of Precincts: Total
+#> 3  2020 D2a   D2a Total Precincts       
+#> 4  2022 D1a   D1a Total Precints        
+#> 5  2024 D1a   D1a Total Precincts
+```
+
+The code is `D1a` in 2016, wanders to `D3a` and then `D2a`, and returns to `D1a`
+in 2022. Checking only the first and last cycle suggests a stable code. In
+between, `D1a` means votes cast in 2018 and Election Day poll-place voters in
+2020, so a series pulled by code would silently mix three different quantities.
+
+The `note` column exists for exactly this:
+
+
+``` r
+cat(strwrap(eavs_items("precincts_total")$note[1], 78), sep = "\n")
+#> D1a='Total Precincts'. TRAP: D1a-2018='Votes Cast: Total'; D1a-2020='Voted
+#> Poll Place Election Day'.
+```
+
+Search by code when you have a codebook in front of you, or by concept when you
+know what you want:
+
+
+``` r
+eavs_items("C9a")[, c("concept", "year", "code")]
+#> # A tibble: 2 × 3
+#>   concept        year code 
+#>   <chr>         <int> <chr>
+#> 1 mail_rejected  2022 C9a  
+#> 2 mail_rejected  2024 C9a
+```
+
+## Confidence, and where to be careful
+
+Every mapping carries a rating. Anything below `high` means the definition
+shifted and the `note` explains how:
+
+
+``` r
+d <- eavs_dictionary
+table(d$confidence)
+#> 
+#>   high    low medium 
+#>    201      1      3
+subset(d, confidence != "high", select = c("concept", "year", "code"))
+#> # A tibble: 4 × 3
+#>   concept             year code 
+#>   <chr>              <int> <chr>
+#> 1 polling_places_ed   2016 <NA> 
+#> 2 partic_by_mail      2016 F1d  
+#> 3 reg_forms_received  2024 A3a  
+#> 4 ballots_cured       2024 C7b
+```
+
+## Jurisdictions are not counties
+
+The unit is whatever files the survey, which varies by state. Wisconsin reports
+roughly 1,850 municipalities, New England reports towns, Alaska and the
+territories file one row each, and Maine files an extra statewide row carrying
+only its UOCAVA totals:
+
+
+``` r
+j <- subset(eavs_jurisdictions, year == 2024)
+sort(table(j$type), decreasing = TRUE)
+#> 
+#> municipality       county    territory    statewide 
+#>         3477         2977            5            2
+```
+
+Two consequences worth planning around. County rollups drop anything whose
+published code embeds no county, and say so:
+
+
+``` r
+panel <- eavs_load(2024, quiet = TRUE)
+cty <- eavs_aggregate(panel, by = "county", concepts = "partic_total")
+#> ! Dropping 1867 rows with no county in the published code.
+#> ℹ Wisconsin's non-geographic serials, Maine's statewide row, Alaska, and the
+#>   territories have none.
+nrow(cty)
+#> [1] 3044
+```
+
+Wisconsin is excluded even though its county is printed in every jurisdiction
+name, and `eavs_jurisdictions` parses it into `county_name`. The reason is that
+the municipalities straddling county lines include the City of Milwaukee:
+
+
+``` r
+wi <- subset(eavs_jurisdictions, year == 2024 & state_abbr == "WI")
+sum(is.na(wi$county_name))
+#> [1] 58
+grep("MILWAUKEE|APPLETON", wi$jurisdiction_name[is.na(wi$county_name)], value = TRUE)
+#> [1] "CITY OF APPLETON - MULTIPLE COUNTIES"  "CITY OF MILWAUKEE - MULTIPLE COUNTIES"
+```
+
+A Wisconsin county rollup would therefore be missing the state's largest city,
+which is worse than not offering one. Use `county_name` for filtering and joins;
+do not build county totals from it without deciding what to do about those rows.
+
+## Who counts as a state
+
+State-level output includes the territories and the District of Columbia,
+because they file real data. `entity_type` makes a 50-state analysis one filter:
+
+
+``` r
+agg <- eavs_aggregate(panel, concepts = "partic_total")
+table(agg$entity_type)
+#> 
+#>  district     state territory 
+#>         1        50         5
+subset(agg, entity_type != "state", select = c("state_abbr", "entity_type", "value"))
+#> # A tibble: 6 × 3
+#>   state_abbr entity_type   value
+#>   <chr>      <chr>         <dbl>
+#> 1 AS         territory     10215
+#> 2 DC         district     328871
+#> 3 GU         territory     30283
+#> 4 MP         territory     12610
+#> 5 PR         territory   1283628
+#> 6 VI         territory     15952
+```
+
+Puerto Rico is absent in midterm years, which will look like missing data in a
+panel unless you know to expect it.
+
+## The other 500 columns
+
+The dictionary covers around 40 concepts, not the roughly 540 columns each file
+carries. That is a curation choice, not a restriction: everything else is still
+available, and the decoding that makes EAVS usable applies to all of it.
+
+
+``` r
+raw <- eavs_read(2024, quiet = TRUE)
+dim(raw)
+#> [1] 6461  537
+decoded <- eavs_recode_missing(raw)
+sum(vapply(decoded, is.numeric, logical(1)))
+#> [1] 421
+```
+
+`eavs_read()` returns the file exactly as published, every column as text, so
+FIPS codes keep their leading zeros. `eavs_recode_missing()` then decodes
+sentinels across every numeric item, whether or not it is in the crosswalk.
+Mail rejection reasons are a good example of something researchers often want:
+
+
+``` r
+reasons <- c(C9b = "late", C9c = "missing voter signature",
+             C9e = "non-matching signature")
+sapply(names(reasons), function(cd) sum(decoded[[cd]], na.rm = TRUE))
+#>    C9b    C9c    C9e 
+#> 103441  53511 197979
+```
+
+`eavs_missing_status()` works on these too, and once a column is attached to a
+harmonized panel, `eavs_aggregate()` and `eavs_rate()` treat it like any other
+numeric column:
+
+
+``` r
+tidy <- eavs_harmonize(decoded, year = 2024)
+tidy$rejected_late <- decoded$C9b[match(tidy$fips_code, raw$FIPSCode)]
+head(eavs_rate(tidy, "rejected_late", "mail_rejected")[, c("state_abbr", "rate", "n_both")], 3)
+#> # A tibble: 3 × 3
+#>   state_abbr   rate n_both
+#>   <chr>       <dbl>  <int>
+#> 1 AK          0.169      1
+#> 2 AL         NA          0
+#> 3 AR          0.209     62
+```
+
+What you do not get is the cross-year work. You have to find each year's code
+yourself, and the traps above are live: mail rejection reasons are `C4b`–`C4l` in
+2018 and 2020 but `C9b`–`C9l` from 2022, and `C4b` means a drop-box count in the
+later years. The 2016 file is a bigger step, with different column naming
+throughout:
+
+
+``` r
+c(cols_2016 = ncol(eavs_read(2016, quiet = TRUE)), cols_2024 = ncol(raw))
+#> cols_2016 cols_2024 
+#>       595       537
+grep("^A2", names(eavs_read(2016, quiet = TRUE)), value = TRUE)
+#> [1] "A2"          "A2c_Other"   "A2_Comments"
+grep("^A2", names(raw), value = TRUE)
+#> [1] "A2a"        "A2b"        "A2c"        "A2Comments"
+```
+
+Same-day registration is `A2a` from 2018 on, but in 2016 the item is `A4a`, and
+`A4a` in later years means mail registration forms. If you are doing single-year
+work on an uncurated item, the package already handles the hard part. If you are
+building a cross-year series from one, verify each year's code against that
+year's codebook, and consider whether the concept belongs in the crosswalk
+instead.

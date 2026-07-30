@@ -1,0 +1,158 @@
+---
+title: "Missingness and coverage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Missingness and coverage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+EAVS is a census of election jurisdictions, not a sample, so there are no survey
+weights and no sampling error to report. What there is instead is item
+nonresponse, unevenly spread across roughly 6,460 independent jurisdictions. A
+state total is the sum of whoever answered, and the useful question is always
+how much of the state that was.
+
+
+``` r
+library(tidyeavs)
+
+panel <- eavs_load(2024, quiet = TRUE)
+```
+
+## Why a value is absent
+
+EAVS does not just leave cells empty. It distinguishes "does not apply" (`-88`),
+"data not available" (`-99`), and a valid skip (`-77`), and those mean opposite
+things: the first says nothing is missing, the second says something is. Loading
+decodes all of them to `NA`, which is convenient and throws the distinction
+away. `eavs_missing_status()` recovers it from the raw file:
+
+
+``` r
+raw <- eavs_read(2024, quiet = TRUE)
+status <- eavs_harmonize(eavs_missing_status(raw), year = 2024)
+table(status$prov_rejected)
+#> 
+#>       reported does_not_apply  not_available     valid_skip  other_missing 
+#>           5162           1000            298              0              0 
+#>          blank 
+#>              1
+```
+
+A thousand jurisdictions did not have provisional ballots to reject. Counting
+them as a gap would be wrong, and the difference is not small:
+
+
+``` r
+without <- eavs_aggregate(panel)
+with    <- eavs_aggregate(panel, status = status)
+
+round(c(
+  collapsed = mean(without$coverage[without$concept == "prov_rejected"], na.rm = TRUE),
+  reason_aware = mean(with$coverage[with$concept == "prov_rejected"], na.rm = TRUE)
+), 3)
+#>    collapsed reason_aware 
+#>        0.879        0.947
+```
+
+Pass `status` whenever you care about coverage. Without it every absence lands in
+`n_missing` and coverage reads as a lower bound; the `coverage_exact` column
+records which of the two you are looking at.
+
+## The five buckets
+
+
+``` r
+cols <- c("n_reported", "n_missing", "n_blank", "n_not_applicable",
+          "n_not_collected", "n_total")
+subset(with, concept == "prov_rejected" & state_abbr %in% c("ME", "AR", "GA"),
+       select = c("state_abbr", cols))
+#> # A tibble: 3 × 7
+#>   state_abbr n_reported n_missing n_blank n_not_applicable n_not_collected n_total
+#>   <chr>           <int>     <int>   <int>            <int>           <int>   <int>
+#> 1 AR                 65         9       1                0               0      75
+#> 2 GA                151         8       0                0               0     159
+#> 3 ME                  0         1       0              496               0     497
+```
+
+Maine is the clearest illustration: nearly every one of its municipalities said
+the item does not apply, so almost nothing is missing even though almost nothing
+was reported. Arkansas shows all three kinds of absence at once.
+
+`n_reported` gave a number. `n_missing` are the genuine gaps. `n_blank` left the
+cell empty, which the file does not explain, so those are counted apart rather
+than assumed either way. `n_not_applicable` said the item did not pertain.
+`n_not_collected` were never asked, because the concept was not on that year's
+questionnaire. The five always sum to `n_total`.
+
+`coverage` is `n_reported` over the first three: the share of jurisdictions that
+could have answered and did. Blanks count as gaps, which keeps coverage a lower
+bound wherever they are common.
+
+## Jurisdictions are not the same size
+
+Coverage counts jurisdictions, and jurisdictions are wildly unequal. A rollup
+missing Los Angeles County is not comparable to one missing a Wisconsin town of
+forty voters. `coverage_reg` weights the same ratio by each jurisdiction's
+registered and eligible voters:
+
+
+``` r
+cured <- subset(with, concept == "ballots_cured" & state_abbr %in% c("AR", "OH", "CA"),
+                select = c("state_abbr", "n_reported", "n_total",
+                           "coverage", "coverage_reg"))
+transform(cured, coverage = round(coverage, 3), coverage_reg = round(coverage_reg, 3))
+#>   state_abbr n_reported n_total coverage coverage_reg
+#> 1         AR          6      75    0.080        0.160
+#> 2         CA         48      58    0.828        0.851
+#> 3         OH         65      88    0.739        0.795
+```
+
+Arkansas reported curing counts from 6 of its 75 jurisdictions, which is 8% of
+them but 16% of its registered voters: the reporters skew large, as they usually
+do. Since `value` is a sum of counts, the weighted figure is generally the better
+guide to how much of the total you actually have.
+
+This weights the diagnostic only. No value is ever reweighted, because EAVS has
+no weights to apply. And registration concepts weighted by registration are
+mildly circular, which is documented rather than special-cased.
+
+## What a total is, and is not
+
+Every EAVS item is a nonnegative count, so a total computed with `na.rm = TRUE`
+over incomplete reporting is a **lower bound**. That is arithmetic, not
+interpretation. The package will not scale a total up to compensate, because
+doing so would require assuming the non-reporters look like the reporters, and
+that assumption is exactly what missingness this uneven makes unsafe.
+
+Two habits follow. Report coverage next to any total you publish. And when
+coverage is low, prefer a rate over a level, since a rate over the common subset
+(see `vignette("getting-started")`) is far less sensitive to who is absent than a
+sum is.
+
+## Blanks, and one specific case
+
+The ambiguous bucket has a concentration worth knowing about. In 2016 nearly all
+blanks in the shipped concepts are Maine, whose municipalities leave the UOCAVA
+items to a statewide row. The EAC codes those same rows "does not apply" in later
+cycles, so the 2016 blanks are almost certainly skips rather than nonresponse:
+
+
+``` r
+p16 <- eavs_load(2016, quiet = TRUE)
+s16 <- eavs_harmonize(eavs_missing_status(eavs_read(2016, quiet = TRUE)), year = 2016)
+a16 <- eavs_aggregate(p16, status = s16)
+subset(a16, state_abbr == "ME" & concept == "uocava_counted",
+       select = c("n_reported", "n_missing", "n_blank", "coverage"))
+#> # A tibble: 1 × 4
+#>   n_reported n_missing n_blank coverage
+#>        <int>     <int>   <int>    <dbl>
+#> 1          1         0     500  0.00200
+```
+
+They are counted as blanks rather than reinterpreted, because the file does not
+say and this package does not guess. If you decide they are skips, moving them
+out of the denominator is your call to make and one line to do.

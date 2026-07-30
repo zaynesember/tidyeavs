@@ -12,18 +12,18 @@
 # Example code in package build process
 *-Ex.R
 
-# Output files from R CMD build
-/*.tar.gz
+# Output files from R CMD build (land wherever the command was run from)
+*.tar.gz
 
 # Output files from R CMD check
-/*.Rcheck/
+*.Rcheck/
 
 # RStudio files
 .Rproj.user/
 
 # produced vignettes
-vignettes/*.html
-vignettes/*.pdf
+**/vignettes/*.html
+**/vignettes/*.pdf
 
 # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
 .httr-oauth
@@ -47,3 +47,18 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# data-raw source downloads (codebooks, staging) — not shipped
+**/data-raw/sources/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+.venv/
+venv/
