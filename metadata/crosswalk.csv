@@ -30,12 +30,12 @@ jurisdiction_name,2020,Jurisdiction_Name,,high,
 jurisdiction_name,2022,Jurisdiction_Name,,high,
 jurisdiction_name,2024,Jurisdiction_Name,,high,
 mail_counted,2016,C4a,C4a. Absentee ballots returned: counted,high,2016 uses C4a='Absentee ballots returned: counted'. TRAP: C4a-2018/2020='By-mail Rejected Total' (REJECTED); C4a-2022/2024='Drop Boxes Election Day Total'.
-mail_counted,2018,C3a,By-mail Ballots Counted: Total,high,C3a='By-mail Ballots Counted: Total'. TRAP: C3a-2022/2024='Drop Boxes Total'.
+mail_counted,2018,C3a,By-mail Ballots Counted: Total,high,"C3a='By-mail Ballots Counted: Total'. TRAP: C3a-2022/2024='Drop Boxes Total'. KNOWN ANOMALY: all 36 Oregon counties answer 2018 for a small subset (7,043 statewide against 1.9M returned); see known_anomalies."
 mail_counted,2020,C3a,C3a By-mail Counted Total,high,C3a (EPI anchor C8a-2024=C3a-2020). TRAP: C3a-2022/2024='Drop Boxes Total'; C8a does not exist in 2020.
 mail_counted,2022,C8a,C8a Total Mail Ballots Counted,high,"C8a='Total Mail Ballots Counted'. NOTE: 2022 ALREADY matches 2024 (C8a), NOT 2020 (C3a) - the hard break is 2020->2022 (drop-box questions C3-C6 inserted, pushing counted to C8)."
 mail_counted,2024,C8a,C8a Total Mail Ballots Counted,high,C8a (EPI domAbs_Counted=C8a). Code path: C4a(2016)->C3a(2018/2020)->C8a(2022/2024). TRAP: C3a-2024='Drop Boxes Total'.
 mail_rejected,2016,C4b,C4b. Absentee ballots returned: rejected,high,"2016 uses C4b='Absentee ballots returned: rejected'. TRAP: C4b-2018+ ='By-mail Rejected: Deadline' (a rejection REASON, not the total)."
-mail_rejected,2018,C4a,By-mail Ballots Rejected: Total,high,C4a='By-mail Ballots Rejected: Total'. TRAP: C4a-2016='counted'; C4a-2022/2024='Drop Boxes Election Day Total'.
+mail_rejected,2018,C4a,By-mail Ballots Rejected: Total,high,"C4a='By-mail Ballots Rejected: Total'. TRAP: C4a-2016='counted'; C4a-2022/2024='Drop Boxes Election Day Total'. KNOWN ANOMALY: all 36 Oregon counties answer 2018 for a small subset (176 statewide against 1.9M returned, versus ~17.5k in 2016/2020); see known_anomalies."
 mail_rejected,2020,C4a,C4a By-mail Rejected Total,high,C4a (EPI anchor C9a-2024=C4a-2020). TRAP: C4a-2022/2024='Drop Boxes Election Day Total'; C9a does not exist in 2020.
 mail_rejected,2022,C9a,C9a Mail Rejected Total,high,"C9a='Mail Rejected Total'. NOTE: 2022 matches 2024 (C9a), NOT 2020 (C4a) - hard break 2020->2022."
 mail_rejected,2024,C9a,C9a Total Mail Ballots Rejected,high,C9a (EPI domAbs_Rejected=C9a). Code path: C4b(2016)->C4a(2018/2020)->C9a(2022/2024). TRAP: C4a-2024='Drop Boxes Election Day Total'.
@@ -105,10 +105,15 @@ poll_workers_total,2020,D7a,D7a Total Poll Workers,high,D7a='Total Poll Workers'
 poll_workers_total,2022,D7a,D7a Total Poll Workers,high,D7a. Stable 2020-2024.
 poll_workers_total,2024,D7a,D7a Total Poll Workers,high,D7a. Stable 2020-2024.
 polling_places_ed,2016,,,low,"NA (low): 2016 has NO single Election Day polling-place total. D2a='Physical Polling Places: Total' is the GRAND total incl. early voting; the ED total must be summed from D2b (ED, not election office) + D2c (ED, election office) + D2d (ED, other). Not directly comparable to D4a-2018/D3a-2020+."
-polling_places_ed,2018,D4a,Election Day Polling Places: Total,high,D4a='Election Day Polling Places: Total'. TRAP: D3a-2018='Number of Precincts: Total' (precincts).
+polling_places_ed,2018,D4a,Election Day Polling Places: Total,high,"D4a='Election Day Polling Places: Total'. TRAP: D3a-2018='Number of Precincts: Total' (precincts). KNOWN ANOMALY: all 99 Iowa counties report 2018 equal to F1b (Election Day voters), putting the national total near 1.02M against 95k-107k in other cycles; see known_anomalies."
 polling_places_ed,2020,D3a,D3a Total Polling Places Election Day,high,D3a='Total Polling Places Election Day'. Code shifted D4a(2018)->D3a(2020+).
 polling_places_ed,2022,D3a,D3a Total Polling Places Election Day,high,D3a. Stable 2020-2024.
 polling_places_ed,2024,D3a,D3a Total Polling Places Election Day,high,D3a. Stable 2020-2024. (EPI lists only subparts D3b/D3c; D3a is the ED total from the codebook.)
+precincts_total,2016,D1a,D1a. Total Precincts,high,D1a='Total Precincts'. TRAP: D1a-2018='Votes Cast: Total'; D1a-2020='Voted Poll Place Election Day'.
+precincts_total,2018,D3a,Number of Precincts: Total,high,"D3a='Number of Precincts: Total'. TRAP: D3a-2020/2022/2024='Total Polling Places Election Day', which is polling places, not precincts."
+precincts_total,2020,D2a,D2a Total Precincts,high,D2a='Total Precincts'. TRAP: D2a-2018='Voted at Poll Place on Election Day'; D2a-2022/2024='Total Polling Places'.
+precincts_total,2022,D1a,D1a Total Precints,high,"D1a='Total Precints' (the EAC's spelling). The precinct total is D1a in 2016, D3a in 2018, D2a in 2020, then D1a again: the code returns rather than staying put."
+precincts_total,2024,D1a,D1a Total Precincts,high,D1a='Total Precincts'. Stable 2022-2024.
 prov_counted_full,2016,E1b,E1b. Provisional ballots submitted: Counted full ballot,high,Provisional ballots counted in full. Same code E1b all years.
 prov_counted_full,2018,E1b,Provisional Ballots: Counted Full Ballot,high,Provisional ballots counted in full. Same code E1b all years.
 prov_counted_full,2020,E1b,E1b Provisional Counted Full Ballot,high,Provisional ballots counted in full. Same code E1b all years.
@@ -169,6 +174,11 @@ reg_removed_total,2018,A9a,Voters Removed: Total,high,"A9a. TRAP: A9a-2024='Mail
 reg_removed_total,2020,A9a,A9a Removed Total,high,"A9a. TRAP: A9a-2024='Mail Other', NOT removed."
 reg_removed_total,2022,A9a,A9a Removed Total,high,"A9a. TRAP: A9a-2024='Mail Other', NOT removed."
 reg_removed_total,2024,A12a,A12a Removed Total,high,A12a (EPI totalRemoved=A12a). Code shifted A9a(2018-2022)->A12a(2024). TRAP: A9a-2024='Mail Other'.
+reg_same_day,2016,A4a,A4a. Same day registration forms: Total,high,"A4a='Same day registration forms: Total'. TRAP: A4a-2018/2020/2022/2024='Total forms: Mail' (mail registration forms), so carrying A4a forward silently switches concepts."
+reg_same_day,2018,A2a,Total New Same Day Registrations,high,A2a='Total New Same Day Registrations'. The item is A4a in 2016.
+reg_same_day,2020,A2a,A2a Total SDR,high,A2a. Stable 2018-2024.
+reg_same_day,2022,A2a,A2a Total SDR,high,A2a. Stable 2018-2024.
+reg_same_day,2024,A2a,A2a Total SDR,high,"A2a. Stable 2018-2024. Counts forms received on days when a voter could both register and vote, including states allowing it only for President."
 state_abbr,2016,State,,high,
 state_abbr,2018,State_Abbr,,high,
 state_abbr,2020,State_Abbr,,high,

@@ -32,7 +32,7 @@ def load(
     A word of caution on aggregating the result: a jurisdiction that did not
     report an item is ``NA``, so a ``sum()`` with ``skipna=True`` silently covers
     only the jurisdictions that reported. When a large jurisdiction is missing —
-    Cook County, Illinois is the recurring example — a state total can be badly
+    Cook County, Illinois is the recurring example—a state total can be badly
     off. :func:`tidyeavs.missing_status` is how you check coverage first.
     """
     # numbers.Integral covers numpy.int64, which pandas hands back and which

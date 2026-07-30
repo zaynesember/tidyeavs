@@ -57,32 +57,50 @@ jurisdiction-year panel:
 ```r
 library(tidyeavs)
 
-panel <- eavs_load(2016:2024)
+panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024))
 ```
 
 The first call for a given year downloads the file (a few megabytes) and caches
 it; later calls read from the cache. Because the columns are harmonized, the
-years stack, and you can work with the result like any other tibble:
+years stack, and the result is an ordinary tibble.
+
+The tempting way to get a state's mail rejection rate—sum `mail_rejected`,
+sum `mail_returned`, divide—is wrong more often than you'd expect, because
+whole states report one side and not the other. All 67 Alabama counties report
+returned ballots and none report rejections, so the naive division hands you a
+clean-looking 0.0%; in 2022 Idaho it gives 0.0008% where the defensible figure
+is 0.21%. `eavs_rate()` computes the rate the way the EAC's published rates
+are computed—over the jurisdictions that reported both sides—and says what
+that restriction kept:
 
 ```r
-library(dplyr)
-
-panel |>
-  filter(year == 2024) |>
-  group_by(state_abbr) |>
-  summarise(
-    returned = sum(mail_returned, na.rm = TRUE),
-    rejected = sum(mail_rejected, na.rm = TRUE)
-  ) |>
-  mutate(rejection_rate = rejected / returned)
+eavs_rate(panel, "mail_rejected", "mail_returned")
 ```
 
-A word of caution on that `na.rm = TRUE`: a jurisdiction that didn't report an
-item is dropped from the sum, so a state total silently covers only the
-jurisdictions that reported. When a large jurisdiction is missing—Cook County
-in Illinois is the recurring example—a state total can be badly off. It's
-worth checking coverage before trusting an aggregate (see `eavs_missing_status()`
-below).
+Read `n_both` (how many jurisdictions stand behind the rate) and `den_share`
+(how much of the state's reported denominator they hold) before quoting a
+number; Alabama comes back as `rate = NA` with `n_num_only = 67` instead of a
+fake zero.
+
+Totals have the same exposure in milder form: a jurisdiction that didn't
+report an item is simply absent from a sum, so a state total silently covers
+only the reporters. `eavs_aggregate()` reports each total alongside counts of
+who reported and why the rest are absent, so under-coverage is visible instead
+of silent. And for anything spanning years, run `eavs_flags()`—it flags sums
+that don't reconcile, hard year-over-year swings, and the verified statewide
+reporting anomalies that pass every arithmetic check (Oregon's 2018 mail
+disposition numbers are the standing example).
+
+## Vignettes
+
+Four, and the first one covers the task above in more depth:
+
+```r
+vignette("getting-started", package = "tidyeavs")        # a mail rejection rate, end to end
+vignette("missingness", package = "tidyeavs")            # coverage, and what a total is not
+vignette("comparing-across-years", package = "tidyeavs") # flags triage, known anomalies
+vignette("survey-structure", package = "tidyeavs")       # codes, jurisdictions, uncurated columns
+```
 
 ## Missing values
 

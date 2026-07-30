@@ -41,6 +41,8 @@ packages = ["src/tidyeavs"]
 [tool.hatch.build.targets.wheel.force-include]
 "../metadata/concepts.csv" = "tidyeavs/metadata/concepts.csv"
 "../metadata/crosswalk.csv" = "tidyeavs/metadata/crosswalk.csv"
+"../metadata/checks.csv" = "tidyeavs/metadata/checks.csv"
+"../metadata/known_anomalies.csv" = "tidyeavs/metadata/known_anomalies.csv"
 "../metadata/manifest.csv" = "tidyeavs/metadata/manifest.csv"
 "../metadata/jurisdictions.csv" = "tidyeavs/metadata/jurisdictions.csv"
 "../metadata/schema.json" = "tidyeavs/metadata/schema.json"

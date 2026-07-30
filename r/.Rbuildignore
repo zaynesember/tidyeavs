@@ -7,3 +7,5 @@
 ^Meta$
 ^scratch$
 ^LICENSE\.md$
+^vignettes/.*\.Rmd\.orig$
+^vignettes/precompute\.R$

@@ -17,12 +17,15 @@ eavs_aggregate(
 \code{\link[=eavs_harmonize]{eavs_harmonize()}}.}
 
 \item{status}{Optional. The matching \code{\link[=eavs_missing_status]{eavs_missing_status()}} output, harmonized
-the same way, which makes the coverage counts reason-aware. Must have the
-same number of rows as \code{data}.}
+the same way, which makes the coverage counts reason-aware. It must line up
+with \code{data} row for row; \code{year} and \code{fips_code} are checked, so a frame
+bound in a different year order is an error rather than wrong coverage.}
 
 \item{by}{\code{"state"} (default) or \code{"county"}. County rollups drop rows whose
-published code embeds no county — Wisconsin's non-geographic serials, Maine's
-statewide row, Alaska and the territories — and say how many, loudly.}
+published code embeds no county, and say how many: Wisconsin's serials,
+Maine's statewide row, Alaska, the territories. Wisconsin stays out even
+though \link{eavs_jurisdictions} parses its county names, because the ~57
+municipalities that straddle county lines include the City of Milwaukee.}
 
 \item{concepts}{Optional character vector limiting which concepts to roll up.}
 
@@ -31,54 +34,67 @@ to the bundled \link{eavs_jurisdictions}.}
 }
 \value{
 A tibble with one row per group per concept per year: the grouping
-columns, \code{concept}, \code{value}, \code{n_reported}, \code{n_missing}, \code{n_not_applicable},
-\code{n_total}, \code{coverage}, and \code{coverage_exact}.
+columns, \code{entity_type} (\code{"state"}, \code{"territory"}, or \code{"district"}, so a
+50-state analysis is one filter), \code{concept}, \code{value}, the five bucket
+counts, \code{n_total}, \code{coverage}, \code{coverage_reg}, and \code{coverage_exact}.
 }
 \description{
-Sums a harmonized panel (see \code{\link[=eavs_load]{eavs_load()}}) to one row per group per concept.
-EAVS totals are only as good as the jurisdictions behind them, so this reports
-how many jurisdictions stood behind each number rather than leaving you to
-assume all of them did.
+Sums a harmonized panel (see \code{\link[=eavs_load]{eavs_load()}}) to one row per group per concept,
+and reports how many jurisdictions stood behind each number rather than
+leaving you to assume all of them did.
 }
 \details{
-The output is long — one row per \code{year}, group, and \code{concept} — because a wide
-frame carrying a value plus three counts for each of ~35 concepts is unusable.
+The output is long, one row per \code{year}, group, and \code{concept}, because a wide
+frame carrying a value plus five counts for each of ~40 concepts is unusable.
 Pivot it yourself if you want concepts as columns.
 }
 \section{Coverage}{
 
 Pass \code{status} (a \code{\link[=eavs_missing_status]{eavs_missing_status()}} frame put through
-\code{\link[=eavs_harmonize]{eavs_harmonize()}}) and the counts distinguish \emph{why} a jurisdiction is absent,
-which matters more than it sounds. EAVS separates "does not apply" from "data
+\code{\link[=eavs_harmonize]{eavs_harmonize()}}) and the counts distinguish \emph{why} a jurisdiction is
+absent. That distinction matters: EAVS separates "does not apply" from "data
 not available", and treating them alike misreports coverage in both
-directions: in 2024, 1,000 jurisdictions reported no provisional ballots at
-all, so counting them as a gap drops apparent coverage of
-\code{prov_rejected} from 94.5\% to 79.9\% when nothing is actually missing.
+directions. In 2024 a thousand jurisdictions had no provisional ballots at
+all, so counting them as gaps drops apparent coverage of \code{prov_rejected}
+from 94.5\% to 79.9\% when nothing is missing.
 
-Three buckets, then:
+Five buckets, which sum to \code{n_total}:
 \itemize{
-\item \code{n_reported} — jurisdictions that gave a number, and so are in \code{value}.
-\item \code{n_missing} — genuine gaps: \code{not_available}, \code{other_missing}, \code{blank}. These
-are what make a total untrustworthy.
-\item \code{n_not_applicable} — \code{does_not_apply} and \code{valid_skip}. The item did not
-pertain, so nothing is missing. Excluded from the \code{coverage} denominator.
+\item \code{n_reported} gave a number, and are in \code{value}.
+\item \code{n_missing} are the genuine gaps (\code{not_available}, \code{other_missing}): the
+ones that make a total untrustworthy.
+\item \code{n_blank} left the cell empty, which the file does not explain. A blank
+could be a gap or a skip, so it is counted separately and the call is
+yours. Most blanks are 2016 Maine, whose municipalities leave the UOCAVA
+items to the statewide row.
+\item \code{n_not_applicable} said the item did not pertain (\code{does_not_apply},
+\code{valid_skip}), so nothing is missing.
+\item \code{n_not_collected} were never asked, because the concept was not on that
+year's questionnaire.
 }
 
-\code{coverage} is \code{n_reported / (n_reported + n_missing)}: the share of
-jurisdictions that \emph{could} have answered and did. Without \code{status}, the
+\code{coverage} is \code{n_reported / (n_reported + n_missing + n_blank)}: the share of
+jurisdictions that could have answered and did. The last two buckets stay out
+of the denominator, since nothing is missing there. Without \code{status} the
 reason is unknowable after recoding, so every absence lands in \code{n_missing}
-and \code{coverage} is a lower bound; the \code{coverage_exact} column says which
-situation you are in.
+and \code{coverage} is a lower bound; \code{coverage_exact} says which case you have.
+
+\code{coverage_reg} weights the same ratio by \code{reg_eligible_total}, answering how
+much of the electorate the reporters hold rather than how many of them there
+were. Since \code{value} is a sum, that is usually the better guide to how much of
+it you have: in 2024 \code{ballots_cured} comes from 28.5\% of jurisdictions but
+65.9\% of the registered electorate. Jurisdictions with no usable weight leave
+both sides of the ratio, and the column is \code{NA} if the panel carries no
+\code{reg_eligible_total}.
 }
 
 \section{What is not corrected}{
 
-Nothing. Values are summed as reported, with \code{NA} skipped and never imputed —
-a "does not apply" is not turned into a zero. Maine's statewide UOCAVA row and
-the territories are included, since both carry real reported data (in 2024 no
-Maine county reports UOCAVA at all, so dropping that row would lose the
-state's only figures). Filter them out afterwards if your analysis wants that;
-\link{eavs_jurisdictions} types every row so it is a one-liner.
+Nothing. Values are summed as reported, and \code{NA} is skipped rather than
+imputed, so a "does not apply" never becomes a zero. Maine's statewide UOCAVA
+row and the territories are included, because both carry real reported data.
+Filter them afterwards if your analysis wants that; \code{entity_type} and
+\link{eavs_jurisdictions} make it a one-liner.
 }
 
 \examples{
@@ -93,5 +109,6 @@ eavs_aggregate(panel, status = st)
 }
 }
 \seealso{
-\code{\link[=eavs_missing_status]{eavs_missing_status()}} for per-jurisdiction reasons.
+\code{\link[=eavs_rate]{eavs_rate()}} for a rate rather than a total, \code{\link[=eavs_flags]{eavs_flags()}} for
+consistency checks, \code{\link[=eavs_missing_status]{eavs_missing_status()}} for per-jurisdiction reasons.
 }

@@ -121,6 +121,21 @@ def checks() -> pd.DataFrame:
 
 
 @functools.lru_cache(maxsize=1)
+def known_anomalies() -> pd.DataFrame:
+    """Verified reporting anomalies in the published files.
+
+    Statewide conventions that reconcile arithmetically, so no sum or swing
+    check can catch them; :func:`tidyeavs.flags` surfaces each affected
+    observation as ``kind = "known_anomaly"``. Every row cites its evidence in
+    ``source``. Nothing here alters a value.
+    """
+    frame = read_metadata_csv("known_anomalies.csv")
+    return frame.sort_values(["year", "state_abbr", "concept"]).reset_index(
+        drop=True
+    )
+
+
+@functools.lru_cache(maxsize=1)
 def manifest() -> pd.DataFrame:
     """The catalog of downloadable EAVS files, one row per file."""
     return read_metadata_csv("manifest.csv")
@@ -177,5 +192,5 @@ def dictionary() -> pd.DataFrame:
 
 
 def _clear_caches() -> None:
-    for fn in (schema, manifest, jurisdictions, dictionary, checks):
+    for fn in (schema, manifest, jurisdictions, dictionary, checks, known_anomalies):
         fn.cache_clear()

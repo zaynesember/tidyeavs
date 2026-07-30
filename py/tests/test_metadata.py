@@ -17,8 +17,8 @@ def test_metadata_dir_is_found():
 
 def test_dictionary_shape():
     d = tidyeavs.dictionary()
-    assert len(d) == 195
-    assert d["concept"].nunique() == 39
+    assert len(d) == 205
+    assert d["concept"].nunique() == 41
     assert list(d.columns) == [
         "concept",
         "concept_label",
@@ -119,4 +119,29 @@ def test_set_metadata_dir_rejects_a_bad_path(tmp_path):
     finally:
         tidyeavs.set_metadata_dir(None)
     # Restored, so the real crosswalk loads again.
-    assert len(tidyeavs.dictionary()) == 195
+    assert len(tidyeavs.dictionary()) == 205
+
+
+def test_wheel_force_include_covers_every_runtime_metadata_file():
+    """The wheel must ship every metadata file the package reads at runtime.
+
+    checks.csv once missed this list, so an installed copy resolved the
+    packaged metadata directory (schema.json is packaged, and that is the
+    probe) and then crashed inside flags() looking for a file the wheel never
+    carried. reference_totals.csv is exempt: only the test suite reads it.
+    """
+    import json
+    from pathlib import Path
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+    schema_path = tidyeavs.metadata_dir() / "schema.json"
+    with schema_path.open(encoding="utf-8") as fh:
+        files = set(json.load(fh)["files"])
+
+    runtime = files - {"reference_totals.csv"}
+    for name in sorted(runtime):
+        assert f'"../metadata/{name}"' in text, (
+            f"{name} is described in schema.json but not force-included in "
+            "pyproject.toml; an installed wheel would crash reading it."
+        )

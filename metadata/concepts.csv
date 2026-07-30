@@ -11,6 +11,7 @@ reg_inactive,A,Inactive registered voters,totalInactive,TRUE
 reg_new_valid,A,New valid registrations,form_ValidReg,TRUE
 reg_rejected,A,Registration forms invalid or rejected,form_Rejected,TRUE
 reg_removed_total,A,Voters removed from the rolls (total),totalRemoved,TRUE
+reg_same_day,A,Same-day and Election Day registrations,,TRUE
 fwab_counted,B,Federal write-in absentee ballots counted,totalFwabCount,TRUE
 fwab_returned,B,Federal write-in absentee ballots returned,totalFwabReturn,TRUE
 uocava_counted,B,UOCAVA ballots counted,totalUocavaCount,TRUE
@@ -28,6 +29,7 @@ mail_undeliverable,C,Mail/absentee ballots undeliverable,byMail_Undeliv,TRUE
 poll_worker_difficulty,D,Difficulty recruiting poll workers,,FALSE
 poll_workers_total,D,Poll workers (total),,TRUE
 polling_places_ed,D,Election Day polling places,,TRUE
+precincts_total,D,Precincts (total),,TRUE
 prov_counted_full,E,Provisional ballots counted in full,prov_FullCount,TRUE
 prov_counted_partial,E,Provisional ballots counted in part,prov_PartCount,TRUE
 prov_rejected,E,Provisional ballots rejected,prov_Rejected,TRUE

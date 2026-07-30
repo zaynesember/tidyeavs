@@ -10,9 +10,16 @@
 ##
 ## Structural facts encoded below, verified against the published files:
 ##   - Wisconsin codes are 5-digit non-geographic serials (~1,850/year), so no
-##     county is derivable; the county lives in the jurisdiction name. In 2020
-##     the town/village pairs Vernon (82575) and Waukesha (84275), and in 2022
-##     Greenville (31550), each share one serial across two rows.
+##     county is derivable from the code; the county lives in the jurisdiction
+##     name ("TOWN OF VERNON - WAUKESHA COUNTY"), parsed below into
+##     county_name. Split on the LAST " - ": hyphens occur inside names
+##     (TOWN OF LAND O-LAKES - VILAS COUNTY). 56-58 municipalities per year
+##     straddle county lines and are published as "- MULTIPLE COUNTIES"; they
+##     include the City of Milwaukee (14.6% of the state's 2024 participation),
+##     which is why county_name exists for filtering and joins but Wisconsin
+##     stays out of county rollups. In 2020 the town/village pairs Vernon
+##     (82575) and Waukesha (84275), and in 2022 Greenville (31550), each share
+##     one serial across two rows.
 ##   - Maine files a statewide UOCAVA row: FIPS "23." in 2016, "23" after.
 ##   - Sub-county codes in CT/MA/ME/NH/RI/VT are state+county+town, so the
 ##     county is derivable—except five Maine towns coded to county "099",
@@ -114,6 +121,18 @@ build_year <- function(y) {
   stopifnot(all(is.na(d$county_fips) |
                   substr(d$county_fips, 1, 2) == d$state_fips))
 
+  # Wisconsin's county, parsed from the published name (see the header). This
+  # is published data restated in its own column, not an inference: the split
+  # is on the last " - " and anything that is not "<NAME> COUNTY" stays NA.
+  d$county_name <- NA_character_
+  wi <- d$state_abbr == "WI"
+  tail_part <- sub("^.*\\s-\\s", "", d$jurisdiction_name[wi])
+  parsed <- ifelse(grepl(" COUNTY$", tail_part),
+                   sub("\\s+COUNTY$", "", tail_part), NA_character_)
+  multi <- grepl("MULTIPLE COUNTIES$", d$jurisdiction_name[wi])
+  stopifnot(all(!is.na(parsed) | multi), length(unique(parsed[!is.na(parsed)])) == 72)
+  d$county_name[wi] <- parsed
+
   d$nongeo_code <- n == 5
   d$code_padded <- n == 9
   d$shared_code <- d$fips_code %in% d$fips_code[duplicated(d$fips_code)]
@@ -125,6 +144,8 @@ build_year <- function(y) {
     "Alaska administers elections statewide and files as a single jurisdiction."
   d$note[d$fips10 %in% "1500500000"] <-
     "Kalawao County's elections are administered by Maui County."
+  d$note[which(wi)[multi]] <-
+    "Municipality straddles county lines; the published name gives no single county."
   d$note[d$shared_code] <-
     "Published code is shared by two rows this year."
   d$note[d$code_padded] <-
@@ -137,7 +158,7 @@ build_year <- function(y) {
     "Pre-rename Shannon County code; Oglala Lakota County is 4610200000 from 2018 on."
 
   d[, c("year", "fips_code", "fips10", "jurisdiction_name", "state_abbr",
-        "state_name", "state_fips", "county_fips", "type",
+        "state_name", "state_fips", "county_fips", "county_name", "type",
         "nongeo_code", "code_padded", "shared_code", "note")]
 }
 

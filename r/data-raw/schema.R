@@ -7,7 +7,7 @@
 ## and Python cannot drift apart, the types travel with the data rather than
 ## living in each reader's assumptions.
 ##
-## Re-run whenever a column is added, removed, or retyped in any of the four
+## Re-run whenever a column is added, removed, or retyped in any of the
 ## files. Run from the package root:  Rscript data-raw/schema.R
 
 r_type <- function(x) {
@@ -27,6 +27,8 @@ crosswalk <- readr::read_csv("../metadata/crosswalk.csv",
                              col_types = readr::cols(.default = "c"))
 checks <- readr::read_csv("../metadata/checks.csv",
                           col_types = readr::cols(.default = "c"))
+anomalies <- readr::read_csv("../metadata/known_anomalies.csv",
+                             col_types = readr::cols(.default = "c"))
 reference <- readr::read_csv("../metadata/reference_totals.csv",
                             col_types = readr::cols(.default = "c"))
 concepts_types <- c(
@@ -43,6 +45,11 @@ checks_types <- c(
   check = "string", total = "string", parts = "string", section = "string",
   note = "string"
 )
+# Verified reporting anomalies eavs_flags() surfaces; every row cites evidence.
+anomalies_types <- c(
+  year = "integer", state_abbr = "string", concept = "string",
+  note = "string", source = "string"
+)
 # Published EAC figures the test suites assert against, with provenance.
 reference_types <- c(
   year = "integer", metric = "string", relation = "string", value = "number",
@@ -52,6 +59,7 @@ stopifnot(
   setequal(names(concepts), names(concepts_types)),
   setequal(names(crosswalk), names(crosswalk_types)),
   setequal(names(checks), names(checks_types)),
+  setequal(names(anomalies), names(anomalies_types)),
   setequal(names(reference), names(reference_types))
 )
 
@@ -78,17 +86,19 @@ json <- paste0(
   paste0(
     sprintf('    "%s": %s',
             c("concepts.csv", "crosswalk.csv", "checks.csv",
-              "reference_totals.csv", "manifest.csv", "jurisdictions.csv"),
+              "known_anomalies.csv", "reference_totals.csv", "manifest.csv",
+              "jurisdictions.csv"),
             c(as_obj(concepts_types), as_obj(crosswalk_types),
-              as_obj(checks_types), as_obj(reference_types),
-              as_obj(manifest_types), as_obj(jurisdictions_types))),
+              as_obj(checks_types), as_obj(anomalies_types),
+              as_obj(reference_types), as_obj(manifest_types),
+              as_obj(jurisdictions_types))),
     collapse = ",\n"
   ),
   "\n  }\n}\n"
 )
 
 writeLines(json, "../metadata/schema.json")
-message("Wrote ../metadata/schema.json (6 files, ",
+message("Wrote ../metadata/schema.json (7 files, ",
         length(concepts_types) + length(crosswalk_types) + length(checks_types) +
-          length(reference_types) + length(manifest_types) +
-          length(jurisdictions_types), " columns)")
+          length(anomalies_types) + length(reference_types) +
+          length(manifest_types) + length(jurisdictions_types), " columns)")

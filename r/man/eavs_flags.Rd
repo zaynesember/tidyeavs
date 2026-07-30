@@ -4,7 +4,14 @@
 \alias{eavs_flags}
 \title{Flag internal inconsistencies in an EAVS panel}
 \usage{
-eavs_flags(data, checks = NULL, swing_factor = 10, swing_floor = 100)
+eavs_flags(
+  data,
+  checks = NULL,
+  swing_factor = 10,
+  swing_floor = 100,
+  anomalies = NULL,
+  jurisdictions = NULL
+)
 }
 \arguments{
 \item{data}{A harmonized panel from \code{\link[=eavs_load]{eavs_load()}}. Needs \code{year} and, for
@@ -20,18 +27,28 @@ swing checks. Defaults to \code{10}.}
 \item{swing_floor}{Ignore swings where both cycles are below this value, so
 that a count going from 1 to 20 does not dominate the output. Defaults
 to \code{100}.}
+
+\item{anomalies}{The known anomalies to surface. Defaults to the bundled
+\link{eavs_known_anomalies}; pass your own or set to \code{NULL} to skip them.}
+
+\item{jurisdictions}{The jurisdiction table used to line jurisdictions up
+across years for the swing checks. Defaults to the bundled
+\link{eavs_jurisdictions}.}
 }
 \value{
 A tibble with one row per flag: \code{year}, \code{fips_code}, \code{state_abbr},
-\code{jurisdiction_name}, \code{check}, \code{kind} (\code{"sum"} or \code{"swing"}), \code{concept},
+\code{jurisdiction_name}, \code{check}, \code{kind} (\code{"sum"}, \code{"swing"}, or
+\code{"known_anomaly"}), \code{concept},
 \code{observed}, \code{threshold}, \code{excess}, \code{n_parts_reported}, and \code{note}. Zero rows
 if nothing is flagged.
 }
 \description{
 Runs a set of arithmetic checks over a harmonized panel and returns one row
-per flagged observation. Two kinds: subparts summing past a total (see
-\link{eavs_checks}), and a value swinging by more than \code{swing_factor} against the
-same jurisdiction's previous cycle.
+per flagged observation. Three kinds: subparts summing past a total (see
+\link{eavs_checks}), a value swinging by more than \code{swing_factor} against the same
+jurisdiction's previous cycle, and the reporting anomalies recorded in
+\link{eavs_known_anomalies}, which arithmetic cannot catch because the numbers
+reconcile internally.
 }
 \section{These are flags, not errors}{
 
@@ -62,6 +79,10 @@ kind before sorting yourself.
 \code{n_parts_reported} says how many of the check's parts had a value. A partial
 sum that already exceeds the total is still a genuine flag, since the absent
 parts could only add to it.
+
+For a known anomaly there is no comparison, only a documented reason to read
+the value with the \code{note} in hand, so \code{observed} is the reported value and
+\code{threshold}, \code{excess}, and \code{n_parts_reported} are \code{NA}.
 }
 
 \examples{

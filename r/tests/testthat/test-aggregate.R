@@ -64,6 +64,28 @@ test_that("with status, does_not_apply is not counted as a gap", {
   expect_true(is.na(me$coverage))      # nothing could have been answered
 })
 
+test_that("blanks are counted apart and stay in the coverage denominator", {
+  status <- status_fixture()
+  status$mail_rejected <- c("reported", "blank", "reported", "not_available")
+  out <- eavs_aggregate(panel_fixture(), status = status)
+  al <- out[out$concept == "mail_rejected" & out$state_abbr == "AL", ]
+  expect_equal(al$n_reported, 1L)
+  expect_equal(al$n_missing, 0L)
+  expect_equal(al$n_blank, 1L)
+  # A blank counts as a gap in coverage, so the number reads as a lower bound.
+  expect_equal(al$coverage, 0.5)
+})
+
+test_that("entity_type separates states, territories, and DC", {
+  panel <- panel_fixture()
+  panel$state_abbr <- c("AL", "PR", "DC", "ME")
+  out <- eavs_aggregate(panel)
+  types <- unique(out[, c("state_abbr", "entity_type")])
+  expect_equal(types$entity_type[types$state_abbr == "AL"], "state")
+  expect_equal(types$entity_type[types$state_abbr == "PR"], "territory")
+  expect_equal(types$entity_type[types$state_abbr == "DC"], "district")
+})
+
 test_that("not_applicable is excluded from the coverage denominator", {
   out <- eavs_aggregate(panel_fixture(), status = status_fixture())
   al <- out[out$concept == "prov_rejected" & out$state_abbr == "AL", ]
@@ -124,4 +146,53 @@ test_that("multiple years stay separate", {
   out <- eavs_aggregate(panel)
   expect_setequal(unique(out$year), c(2022L, 2024L))
   expect_equal(nrow(out), 2 * 2 * 2) # 2 years x 2 states x 2 concepts
+})
+
+test_that("coverage_reg weights coverage by reg_eligible_total", {
+  panel <- panel_fixture()
+  panel$reg_eligible_total <- c(1000, 3000, 500, 1500)
+  out <- eavs_aggregate(panel)
+  me <- out[out$concept == "mail_rejected" & out$state_abbr == "ME", ]
+  expect_equal(me$coverage, 0.5)
+  expect_equal(me$coverage_reg, 0.25) # 500 reported of 2000 answerable
+  al <- out[out$concept == "mail_rejected" & out$state_abbr == "AL", ]
+  expect_equal(al$coverage_reg, 1)
+})
+
+test_that("coverage_reg is NA without the weight, and NA weights drop from both sides", {
+  out <- eavs_aggregate(panel_fixture())
+  expect_true(all(is.na(out$coverage_reg)))
+  panel <- panel_fixture()
+  panel$reg_eligible_total <- c(1000, 3000, 500, NA)
+  out <- eavs_aggregate(panel)
+  me <- out[out$concept == "mail_rejected" & out$state_abbr == "ME", ]
+  # The unreported Maine row has no usable weight, so it leaves the weighted
+  # ratio entirely while the unweighted coverage still counts it as a gap.
+  expect_equal(me$coverage, 0.5)
+  expect_equal(me$coverage_reg, 1)
+})
+
+test_that("an NA reason counts as not collected, and the buckets sum to n_total", {
+  status <- status_fixture()
+  status$mail_rejected <- c("reported", "not_available", NA, NA)
+  out <- eavs_aggregate(panel_fixture(), status = status)
+  me <- out[out$concept == "mail_rejected" & out$state_abbr == "ME", ]
+  expect_equal(me$n_not_collected, 2L)
+  expect_equal(me$n_reported + me$n_missing + me$n_blank + me$n_not_applicable, 0L)
+  expect_true(is.na(me$coverage))      # nothing was asked, so nothing to cover
+  al <- out[out$concept == "mail_rejected" & out$state_abbr == "AL", ]
+  expect_equal(al$n_not_collected, 0L)
+  expect_equal(al$coverage, 0.5)
+  sums <- out$n_reported + out$n_missing + out$n_blank +
+    out$n_not_applicable + out$n_not_collected
+  expect_equal(sums, out$n_total)
+})
+
+test_that("a status frame in the wrong year order is an error, not wrong coverage", {
+  panel <- rbind(panel_fixture(), transform(panel_fixture(), year = 2022L))
+  status <- rbind(status_fixture(), transform(status_fixture(), year = 2022L))
+  expect_silent(out <- eavs_aggregate(panel, status = status))
+  reversed <- status[c(5:8, 1:4), ]
+  expect_equal(nrow(reversed), nrow(panel))   # the row count check cannot see it
+  expect_error(eavs_aggregate(panel, status = reversed), "not aligned")
 })

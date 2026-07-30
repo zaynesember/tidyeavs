@@ -31,10 +31,12 @@ from ._metadata import (
     checks,
     dictionary,
     jurisdictions,
+    known_anomalies,
     manifest,
     metadata_dir,
     set_metadata_dir,
 )
+from ._rate import rate
 from .cache import cache_clear, cache_dir, cache_list, set_cache_dir
 from .download import download
 from .harmonize import harmonize
@@ -55,11 +57,13 @@ __all__ = [
     "missing_status",
     "harmonize",
     "aggregate",
+    "rate",
     "flags",
     "items",
     # shared metadata
     "dictionary",
     "checks",
+    "known_anomalies",
     "manifest",
     "jurisdictions",
     "metadata_dir",

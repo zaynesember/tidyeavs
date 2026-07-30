@@ -94,8 +94,8 @@ def _recode_core(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 def recode_missing(data: pd.DataFrame) -> pd.DataFrame:
     """Convert item columns to numbers, with sentinel values set to ``NA``.
 
-    Identifier and text columns — FIPS codes, jurisdiction and state names,
-    comment and write-in fields — are left untouched, so this is safe to call on
+    Identifier and text columns—FIPS codes, jurisdiction and state names,
+    comment and write-in fields—are left untouched, so this is safe to call on
     a whole raw year from :func:`tidyeavs.read`.
 
     Recognized sentinels keep their specific meaning, which

@@ -91,7 +91,7 @@ def test_numpy_integers_are_accepted_as_a_single_year():
 
     assert manifest_lookup(np.int64(2024))["file_name"].item() == "eavs_2024_csv.zip"
     assert len(manifest_lookup([np.int64(2022), np.int64(2024)])) == 2
-    assert len(tidyeavs.items(year=np.int64(2024))) == 39
+    assert len(tidyeavs.items(year=np.int64(2024))) == 41
 
 
 def test_manifest_lookup_returns_years_in_order():

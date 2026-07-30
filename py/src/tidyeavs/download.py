@@ -34,8 +34,8 @@ def _ssl_context() -> ssl.SSLContext:
     urllib verifies against OpenSSL's compiled-in CA paths, which on the
     python.org macOS builds point at a ``cert.pem`` that is only created once the
     bundled "Install Certificates.command" has been run. A library cannot assume
-    a user has run it — the symptom is every download failing with
-    CERTIFICATE_VERIFY_FAILED — so fall back to certifi's bundle when the default
+    a user has run it—the symptom is every download failing with
+    CERTIFICATE_VERIFY_FAILED—so fall back to certifi's bundle when the default
     store is missing. A working system store is left alone, since on Linux it may
     carry CAs certifi does not.
     """

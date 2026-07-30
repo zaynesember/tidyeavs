@@ -13,21 +13,21 @@ suites check against.
 
 ## The files
 
-Four are hand-edited and are the authoritative source for what they describe:
+Five are hand-edited and are the authoritative source for what they describe:
 
-- **`concepts.csv`** — one row per concept: its `section` (`id`, or `A`–`F`), a
+- **`concepts.csv`**—one row per concept: its `section` (`id`, or `A`–`F`), a
   plain-language `concept_label`, the MIT EPI's name for it where one exists, and
   `shipped`, which decides whether the concept reaches a built dictionary. A
   concept with `shipped = FALSE` stays curated here without being exported, which
   is how `poll_worker_difficulty` keeps its verified codes while its ordinal
   encoding is still being worked out.
-- **`crosswalk.csv`** — one row per concept-year: the raw variable `code` that
+- **`crosswalk.csv`**—one row per concept-year: the raw variable `code` that
   year, that year's `codebook_label` kept as provenance, a `confidence` rating,
   and any trap warning in `note`. A blank `code` means the item was not collected
   that year, which is different from an absent row and is why the file is a
   complete concept-year grid.
 
-- **`checks.csv`** — one row per internal-consistency check that `eavs_flags()` /
+- **`checks.csv`**—one row per internal-consistency check that `eavs_flags()` /
   `tidyeavs.flags()` runs. Every check has the same shape: the concepts listed in
   `parts` should not sum past `total`, which covers both simple orderings (one
   part, mail ballots returned against transmitted) and subparts against a total
@@ -38,7 +38,18 @@ Four are hand-edited and are the authoritative source for what they describe:
   count. Checks are validated against the crosswalk at build time, so one naming
   a concept that does not exist fails rather than silently never firing.
 
-- **`reference_totals.csv`** — figures quoted from the EAC's own published
+- **`known_anomalies.csv`**—one row per verified reporting anomaly: a `year`,
+  `state_abbr`, and `concept` whose values reflect a statewide reporting
+  convention rather than the quantity the item asks about. Arithmetic cannot
+  catch these, because the numbers reconcile internally. `eavs_flags()` /
+  `tidyeavs.flags()` surface each affected observation as
+  `kind = "known_anomaly"`.
+
+  The admission rule is strict: verify the row against the published file and
+  cite that evidence in `source`, or the file becomes a place to park hunches.
+  Nothing here alters a value.
+
+- **`reference_totals.csv`**—figures quoted from the EAC's own published
   reports, which both test suites assert against. Each row carries the `source`
   it came from, down to the report and page, and the `relation` (`gt` or `lt`)
   the report's wording supports: the reports state bounds like "over 158 million"
@@ -57,13 +68,13 @@ Four are hand-edited and are the authoritative source for what they describe:
 Two are generated and should not be hand-edited, since the next build overwrites
 them:
 
-- **`manifest.csv`** — written by `r/data-raw/manifest.R`. One row per
+- **`manifest.csv`**—written by `r/data-raw/manifest.R`. One row per
   downloadable file, pinning a published EAC version by SHA-256. `source_url` is
   where the EAC publishes it; `mirror_url` is a byte-identical copy on a GitHub
   release, which the packages try first so that an EAC re-release does not break
   installed copies. Both are checked against the same checksum, so it does not
   matter which one a download came from.
-- **`jurisdictions.csv`** — written by `r/data-raw/jurisdictions.R`. Every
+- **`jurisdictions.csv`**—written by `r/data-raw/jurisdictions.R`. Every
   published jurisdiction row per year, with the type and quirk flags that the
   script's header comment explains. It is generated, but it crosses the language
   boundary as data on purpose: the quirk logic is the part worth not
@@ -71,7 +82,7 @@ them:
 
 And one describes the rest:
 
-- **`schema.json`** — the column types for every CSV here, written by
+- **`schema.json`**—the column types for every CSV here, written by
   `r/data-raw/schema.R`. Re-run it after adding, removing, or retyping a
   column.
 

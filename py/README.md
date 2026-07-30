@@ -58,22 +58,53 @@ panel = tidyeavs.load([2016, 2018, 2020, 2022, 2024])
 
 The first call for a given year downloads the file (a few megabytes) and caches
 it; later calls read from the cache. Because the columns are harmonized, the
-years stack:
+years stack, and the result is an ordinary DataFrame.
+
+The tempting way to get a state's mail rejection rate—sum `mail_rejected`,
+sum `mail_returned`, divide—is wrong more often than you'd expect, because
+whole states report one side and not the other. All 67 Alabama counties report
+returned ballots and none report rejections, so the naive division hands you a
+clean-looking 0.0%; in 2022 Idaho it gives 0.0008% where the defensible figure
+is 0.21%. `rate()` computes the rate the way the EAC's published rates are
+computed—over the jurisdictions that reported both sides—and says what that
+restriction kept:
 
 ```python
-rates = (
-    panel[panel["year"] == 2024]
-    .groupby("state_abbr")[["mail_returned", "mail_rejected"]]
-    .sum()
-)
-rates["rejection_rate"] = rates["mail_rejected"] / rates["mail_returned"]
+tidyeavs.rate(panel, "mail_rejected", "mail_returned")
 ```
 
-A word of caution on that `sum()`: a jurisdiction that didn't report an item is
-`NA` and gets skipped, so a state total silently covers only the jurisdictions
-that reported. When a large jurisdiction is missing—Cook County in Illinois is
-the recurring example—a state total can be badly off. It's worth checking
-coverage with `missing_status()` before trusting an aggregate.
+Read `n_both` (how many jurisdictions stand behind the rate) and `den_share`
+(how much of the state's reported denominator they hold) before quoting a
+number; Alabama comes back as a missing `rate` with `n_num_only = 67` instead
+of a fake zero.
+
+Totals have the same exposure in milder form: a jurisdiction that didn't
+report an item is simply absent from a sum, so a state total silently covers
+only the reporters. `aggregate()` reports each total alongside counts of who
+reported and why the rest are absent, so under-coverage is visible instead of
+silent. And for anything spanning years, run `flags()`—it flags sums that
+don't reconcile, hard year-over-year swings, and the verified statewide
+reporting anomalies that pass every arithmetic check (Oregon's 2018 mail
+disposition numbers are the standing example).
+
+## Longer guides
+
+The conceptual guidance lives in the R package's vignettes, and it is about EAVS
+rather than about R, so it applies here unchanged apart from function names
+(`tidyeavs.rate()` for `eavs_rate()`, and so on). They are worth reading before
+publishing anything:
+
+- **Getting started** builds a state-level mail rejection rate and shows why the
+  obvious way to compute it is wrong.
+- **Missingness and coverage** covers the coverage columns and why a total over
+  incomplete reporting is a lower bound.
+- **Comparing across years safely** covers flag triage and the verified
+  reporting anomalies that pass every arithmetic check.
+- **Survey structure** covers renumbered codes, what a "jurisdiction" is, and
+  how to work with the ~500 columns the crosswalk does not cover.
+
+Read them at <https://github.com/zaynesember/tidyeavs/tree/main/r/vignettes>, or
+from an R session with `vignette(package = "tidyeavs")`.
 
 ## Missing values
 
@@ -111,7 +142,7 @@ silent: `items("uocava_rejected")` shows that the code is `B24a` in 2024 but
 
 ## The pieces
 
-`load()` is the composition of three steps you can also run yourself:
+`load()` is the composition of four steps you can also run yourself:
 
 | Step | Function |
 |------|----------|

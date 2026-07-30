@@ -23,6 +23,13 @@
       "section": "string",
       "note": "string"
     },
+    "known_anomalies.csv": {
+      "year": "integer",
+      "state_abbr": "string",
+      "concept": "string",
+      "note": "string",
+      "source": "string"
+    },
     "reference_totals.csv": {
       "year": "integer",
       "metric": "string",
@@ -53,6 +60,7 @@
       "state_name": "string",
       "state_fips": "string",
       "county_fips": "string",
+      "county_name": "string",
       "type": "string",
       "nongeo_code": "boolean",
       "code_padded": "boolean",

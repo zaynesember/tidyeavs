@@ -1,0 +1,203 @@
+---
+title: "Comparing across years safely"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Comparing across years safely}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+Harmonizing the column names is the easy half of comparing EAVS years. The hard
+half is that a jurisdiction's answer can change because its practice changed,
+because the question changed, or because the way it answered changed, and the
+panel looks identical in all three cases. `eavs_flags()` is how you tell them
+apart, and on a multi-year panel it is not optional.
+
+
+``` r
+library(tidyeavs)
+
+panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024), quiet = TRUE)
+flags <- suppressMessages(eavs_flags(panel))
+nrow(flags)
+#> [1] 16249
+```
+
+That is a lot of flags, so the first job is triage rather than reading.
+
+The messages suppressed above are worth seeing once: `eavs_flags()` reports how
+many jurisdictions in each cycle had no counterpart in the previous one and so
+could not be swing-checked. It is a handful per cycle, mostly genuinely new
+jurisdictions. Jurisdictions are matched on a normalized code rather than the
+published one, because a published code can change without the jurisdiction
+changing, so this count is small on purpose.
+
+## Three kinds, and they mean different things
+
+
+``` r
+table(flags$kind)
+#> 
+#> known_anomaly           sum         swing 
+#>           171          3492         12586
+```
+
+A **sum** flag says subparts add up past their total. A **swing** flag says a
+value moved implausibly against the same jurisdiction's previous cycle. A
+**known_anomaly** flag says something no arithmetic can catch: a state answered
+a question in a way that makes its value incomparable, verified against the
+published file and recorded in `eavs_known_anomalies`.
+
+None of these say a number is wrong. Thousands of independent jurisdictions keep
+records differently, and most flags have ordinary explanations, which each
+check's `note` spells out.
+
+## Triage: filter to your concepts first
+
+Nobody reads 16,000 flags. Filter to the concepts your analysis touches:
+
+
+``` r
+mine <- flags[flags$concept %in% c("mail_returned", "mail_rejected", "mail_counted"), ]
+table(mine$check)
+#> 
+#>              dropped_to_zero                known_anomaly 
+#>                           72                           72 
+#> mail_disposition_le_returned         year_over_year_swing 
+#>                          892                         3164
+```
+
+Then read the biggest ones within a kind. `excess` is a ballot count for sum
+checks and a fold-change for swings, so it only sorts sensibly inside a kind:
+
+
+``` r
+worst <- mine[mine$kind == "sum", ]
+head(worst[order(-worst$excess),
+           c("year", "state_abbr", "jurisdiction_name", "check", "excess")], 5)
+#> # A tibble: 5 × 5
+#>    year state_abbr jurisdiction_name    check                        excess
+#>   <dbl> <chr>      <chr>                <chr>                         <dbl>
+#> 1  2018 CA         CONTRA COSTA COUNTY  mail_disposition_le_returned 124329
+#> 2  2022 UT         WASHINGTON COUNTY    mail_disposition_le_returned  65664
+#> 3  2018 IL         WILL COUNTY          mail_disposition_le_returned  24521
+#> 4  2018 CA         SANTA CLARA COUNTY   mail_disposition_le_returned  22101
+#> 5  2018 CA         SAN FRANCISCO COUNTY mail_disposition_le_returned  17547
+```
+
+## The flag that no arithmetic could have found
+
+Oregon's 2018 mail numbers reconcile perfectly: counted plus rejected is
+comfortably under returned. They are still unusable, because both figures cover
+a small subset of ballots:
+
+
+``` r
+or <- subset(panel, state_abbr == "OR" & year %in% c(2016, 2018, 2020))
+aggregate(cbind(mail_returned, mail_counted, mail_rejected) ~ year,
+          data = or, FUN = sum, na.rm = TRUE, na.action = na.pass)
+#>   year mail_returned mail_counted mail_rejected
+#> 1 2016       2051452      2033878         17574
+#> 2 2018       1907342         7043           176
+#> 3 2020       2397091      2379544         17547
+```
+
+Counted collapses from about 2.0 million to 7,043 and back again, with returned
+barely moving. A rejection rate built on 2018 would read near zero. Coverage
+cannot see this, because every Oregon county answered; only knowing the
+convention helps:
+
+
+``` r
+ka <- flags[flags$kind == "known_anomaly", ]
+unique(ka[, c("year", "state_abbr", "concept")])
+#> # A tibble: 3 × 3
+#>    year state_abbr concept          
+#>   <dbl> <chr>      <chr>            
+#> 1  2018 IA         polling_places_ed
+#> 2  2018 OR         mail_counted     
+#> 3  2018 OR         mail_rejected
+cat(strwrap(unique(ka$note)[1], 78), sep = "\n")
+#> All 99 Iowa counties report this item exactly equal to their Election Day
+#> in-person voters (F1b), county by county, putting the 2018 national total
+#> near 1.02M against 95k-107k in every other cycle. The state's 2018
+#> polling-place counts are not comparable to its other years or to other
+#> states.
+```
+
+Treat a `known_anomaly` row as a stop sign for that state-year, and read the
+`source` column of `eavs_known_anomalies` if you want the evidence.
+
+## Swings, and why they are noisy on purpose
+
+The swing check flags a fold-change past `swing_factor` (10 by default) with both
+cycles above `swing_floor` (100). It is deliberately blunt, and it fires on
+ordinary things:
+
+
+``` r
+sw <- flags[flags$check == "year_over_year_swing", ]
+head(sort(table(sw$concept), decreasing = TRUE), 5)
+#> 
+#>           mail_counted       mail_transmitted         partic_by_mail 
+#>                   1587                   1503                   1441 
+#>          mail_returned reg_confirmations_sent 
+#>                   1384                    787
+```
+
+Mail items dominate, and they should: between 2016 and 2024 this panel spans the
+2020 surge in mail voting and the partial reversion after it, which really did
+move many jurisdictions by more than tenfold. `reg_confirmations_sent` is lumpy
+for a different and equally ordinary reason, since list-maintenance mailings run
+on a multi-year cycle rather than every election. Neither pattern is a data
+problem. If your concept sits high on that list, raise the threshold rather than
+reading every row:
+
+
+``` r
+tight <- suppressMessages(
+  eavs_flags(panel, checks = NULL, anomalies = NULL, swing_factor = 50)
+)
+nrow(tight)
+#> [1] 3189
+```
+
+A `dropped_to_zero` flag is split out separately, because a fall to zero would
+otherwise be an infinite fold-change and would sort above every finite swing.
+It is also the flag most likely to mean "the item went unreported this cycle"
+rather than "the count really became zero", so check the reason before treating
+it as a change.
+
+## Concepts that do not exist in every year
+
+Some items were only ever asked in some cycles. Drop boxes are the clean example:
+
+
+``` r
+eavs_items("drop_boxes_total")[, c("year", "code")]
+#> # A tibble: 5 × 2
+#>    year code 
+#>   <int> <chr>
+#> 1  2016 <NA> 
+#> 2  2018 <NA> 
+#> 3  2020 <NA> 
+#> 4  2022 C3a  
+#> 5  2024 C3a
+```
+
+The panel carries `NA` for 2016 through 2020, which is correct but easy to
+mistake for nonresponse. If you pass a status frame to `eavs_aggregate()`, those
+rows land in `n_not_collected` rather than `n_missing`, and coverage for that
+year is `NA` rather than zero, so "never asked" and "asked and unanswered" stay
+distinguishable. See `vignette("missingness")`.
+
+## A short checklist
+
+Run `eavs_flags()` on the panel, not on a subset you have already narrowed.
+Filter to your concepts, then sort within a kind. Treat known anomalies as
+disqualifying for that state-year. Check `eavs_items()` for any concept whose
+series looks discontinuous, since the `note` column usually explains it. And
+prefer rates over levels when coverage moves between cycles, because a level can
+change simply because more jurisdictions answered.

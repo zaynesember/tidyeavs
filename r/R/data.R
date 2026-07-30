@@ -72,13 +72,13 @@
 #' `note`, never corrected.
 #'
 #' The quirks worth knowing: Wisconsin's ~1,850 codes are non-geographic
-#' serials (the county is only in the name, and a few serials are shared by a
-#' town/village pair); Maine files a statewide row carrying only its UOCAVA
-#' totals; Alaska and the territories file one row each; Kalawao County HI
-#' appears but is administered by Maui County; and two 2024 California codes
-#' lost a leading zero, which `fips10` restores. Connecticut's embedded county
-#' codes are the pre-2022 Census counties, not today's planning regions.
-#' Covers the EAVS only, not the Policy Survey.
+#' serials (the county is only in the name, restated in `county_name`, and a
+#' few serials are shared by a town/village pair); Maine files a statewide row
+#' carrying only its UOCAVA totals; Alaska and the territories file one row
+#' each; Kalawao County HI appears but is administered by Maui County; and two
+#' 2024 California codes lost a leading zero, which `fips10` restores.
+#' Connecticut's embedded county codes are the pre-2022 Census counties, not
+#' today's planning regions. Covers the EAVS only, not the Policy Survey.
 #'
 #' @format A tibble with one row per jurisdiction-year and the columns:
 #' \describe{
@@ -96,6 +96,12 @@
 #'     the published code embeds one; `NA` where it does not (Wisconsin,
 #'     Alaska, territories, place-coded Illinois city boards, a few Maine
 #'     townships).}
+#'   \item{county_name}{For Wisconsin only: the county as published in the
+#'     jurisdiction name, restated as its own column for filtering and joins.
+#'     `NA` for the 56–58 municipalities per year whose names read "MULTIPLE
+#'     COUNTIES"—they straddle county lines, and they include the City of
+#'     Milwaukee, which is why Wisconsin stays out of [eavs_aggregate()]'s
+#'     county rollups even with this column present.}
 #'   \item{type}{Structural type: `"county"` (county or county-equivalent,
 #'     including parishes, independent cities, and the District of Columbia),
 #'     `"municipality"` (sub-county: New England towns, Wisconsin
@@ -136,3 +142,31 @@
 #' @source Built from `metadata/checks.csv`, the committed definition shared with
 #'   the Python implementation. See `data-raw/checks.R`.
 "eavs_checks"
+
+#' Known reporting anomalies in the published files
+#'
+#' Statewide reporting conventions, verified against the published files, that
+#' make one state's value for a concept-year not comparable to its other years.
+#' Arithmetic checks cannot catch these, because the numbers reconcile
+#' internally: in 2018 all 99 Iowa counties report Election Day polling places
+#' equal to their Election Day voters, and all 36 Oregon counties answer the
+#' mail counted and rejected items for a small subset of ballots. Both are how a
+#' state answered the question, not a value this package would change.
+#'
+#' [eavs_flags()] surfaces each affected observation as
+#' `kind = "known_anomaly"`, so an anomaly reaches you through the same output
+#' as the other checks instead of living only in documentation. A row here means
+#' "read this state-year with the note in hand", nothing more, and every row
+#' cites its evidence in `source`.
+#'
+#' @format A tibble with one row per anomaly:
+#' \describe{
+#'   \item{year}{Survey year the anomaly appears in.}
+#'   \item{state_abbr}{State whose reporting the row describes.}
+#'   \item{concept}{The affected concept.}
+#'   \item{note}{What the published values show and what that means for use.}
+#'   \item{source}{The evidence: file, comparison, and date verified.}
+#' }
+#' @source Built from `metadata/known_anomalies.csv`, the committed definition
+#'   shared with the Python implementation. See `data-raw/known_anomalies.R`.
+"eavs_known_anomalies"

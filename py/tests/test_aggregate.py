@@ -86,6 +86,27 @@ def test_does_not_apply_is_not_a_gap():
     assert pd.isna(cell(out, "prov_rejected", "ME", "coverage"))
 
 
+def test_blanks_counted_apart_and_kept_in_coverage_denominator():
+    st = status()
+    st["mail_rejected"] = ["reported", "blank", "reported", "not_available"]
+    out = tidyeavs.aggregate(panel(), status=st)
+    assert cell(out, "mail_rejected", "AL", "n_reported") == 1
+    assert cell(out, "mail_rejected", "AL", "n_missing") == 0
+    assert cell(out, "mail_rejected", "AL", "n_blank") == 1
+    # A blank counts as a gap in coverage, so the number reads as a lower bound.
+    assert cell(out, "mail_rejected", "AL", "coverage") == 0.5
+
+
+def test_entity_type_separates_states_territories_and_dc():
+    p = panel()
+    p["state_abbr"] = ["AL", "PR", "DC", "ME"]
+    out = tidyeavs.aggregate(p)
+    types = dict(zip(out["state_abbr"], out["entity_type"]))
+    assert types["AL"] == "state"
+    assert types["PR"] == "territory"
+    assert types["DC"] == "district"
+
+
 def test_not_applicable_excluded_from_coverage_denominator():
     out = tidyeavs.aggregate(panel(), status=status())
     assert cell(out, "prov_rejected", "AL", "n_reported") == 1
@@ -151,3 +172,54 @@ def test_multiple_years_stay_separate():
     out = tidyeavs.aggregate(p)
     assert set(out["year"]) == {2022, 2024}
     assert len(out) == 2 * 2 * 2
+
+
+def test_coverage_reg_weights_coverage_by_registration():
+    p = panel()
+    p["reg_eligible_total"] = [1000.0, 3000.0, 500.0, 1500.0]
+    out = tidyeavs.aggregate(p)
+    assert cell(out, "mail_rejected", "ME", "coverage") == 0.5
+    assert cell(out, "mail_rejected", "ME", "coverage_reg") == 0.25
+    assert cell(out, "mail_rejected", "AL", "coverage_reg") == 1.0
+
+
+def test_coverage_reg_na_without_weight_and_na_weights_drop():
+    out = tidyeavs.aggregate(panel())
+    assert out["coverage_reg"].isna().all()
+    p = panel()
+    p["reg_eligible_total"] = [1000.0, 3000.0, 500.0, None]
+    out = tidyeavs.aggregate(p)
+    # The unreported Maine row has no usable weight, so it leaves the weighted
+    # ratio entirely while the unweighted coverage still counts it as a gap.
+    assert cell(out, "mail_rejected", "ME", "coverage") == 0.5
+    assert cell(out, "mail_rejected", "ME", "coverage_reg") == 1.0
+
+
+def test_na_reason_counts_as_not_collected_and_buckets_sum():
+    st = status()
+    st["mail_rejected"] = ["reported", "not_available", None, None]
+    out = tidyeavs.aggregate(panel(), status=st)
+    assert cell(out, "mail_rejected", "ME", "n_not_collected") == 2
+    assert cell(out, "mail_rejected", "ME", "n_reported") == 0
+    assert cell(out, "mail_rejected", "ME", "n_missing") == 0
+    assert pd.isna(cell(out, "mail_rejected", "ME", "coverage"))
+    assert cell(out, "mail_rejected", "AL", "n_not_collected") == 0
+    assert cell(out, "mail_rejected", "AL", "coverage") == 0.5
+    sums = (
+        out["n_reported"]
+        + out["n_missing"]
+        + out["n_blank"]
+        + out["n_not_applicable"]
+        + out["n_not_collected"]
+    )
+    assert (sums == out["n_total"]).all()
+
+
+def test_status_in_the_wrong_year_order_is_an_error():
+    p = pd.concat([panel(), panel().assign(year=2022)], ignore_index=True)
+    st = pd.concat([status(), status().assign(year=2022)], ignore_index=True)
+    tidyeavs.aggregate(p, status=st)  # aligned: fine
+    reversed_status = pd.concat([st.iloc[4:], st.iloc[:4]], ignore_index=True)
+    assert len(reversed_status) == len(p)  # the row count check cannot see it
+    with pytest.raises(ValueError, match="not aligned"):
+        tidyeavs.aggregate(p, status=reversed_status)

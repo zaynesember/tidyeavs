@@ -29,6 +29,6 @@ and binding the results.
 }
 \examples{
 \dontrun{
-panel <- eavs_load(2020:2024)
+panel <- eavs_load(c(2020, 2022, 2024))
 }
 }

@@ -21,6 +21,12 @@ for \code{state_abbr}.}
 the published code embeds one; \code{NA} where it does not (Wisconsin,
 Alaska, territories, place-coded Illinois city boards, a few Maine
 townships).}
+\item{county_name}{For Wisconsin only: the county as published in the
+jurisdiction name, restated as its own column for filtering and joins.
+\code{NA} for the 56–58 municipalities per year whose names read "MULTIPLE
+COUNTIES"—they straddle county lines, and they include the City of
+Milwaukee, which is why Wisconsin stays out of \code{\link[=eavs_aggregate]{eavs_aggregate()}}'s
+county rollups even with this column present.}
 \item{type}{Structural type: \code{"county"} (county or county-equivalent,
 including parishes, independent cities, and the District of Columbia),
 \code{"municipality"} (sub-county: New England towns, Wisconsin
@@ -52,12 +58,12 @@ statewide pseudo-rows and duplicated codes—and quirks are flagged in
 }
 \details{
 The quirks worth knowing: Wisconsin's ~1,850 codes are non-geographic
-serials (the county is only in the name, and a few serials are shared by a
-town/village pair); Maine files a statewide row carrying only its UOCAVA
-totals; Alaska and the territories file one row each; Kalawao County HI
-appears but is administered by Maui County; and two 2024 California codes
-lost a leading zero, which \code{fips10} restores. Connecticut's embedded county
-codes are the pre-2022 Census counties, not today's planning regions.
-Covers the EAVS only, not the Policy Survey.
+serials (the county is only in the name, restated in \code{county_name}, and a
+few serials are shared by a town/village pair); Maine files a statewide row
+carrying only its UOCAVA totals; Alaska and the territories file one row
+each; Kalawao County HI appears but is administered by Maui County; and two
+2024 California codes lost a leading zero, which \code{fips10} restores.
+Connecticut's embedded county codes are the pre-2022 Census counties, not
+today's planning regions. Covers the EAVS only, not the Policy Survey.
 }
 \keyword{datasets}

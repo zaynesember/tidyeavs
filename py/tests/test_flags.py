@@ -202,3 +202,126 @@ def test_shipped_checks_only_name_real_concepts():
         assert row["total"] in concepts
         for part in row["parts"]:
             assert part in concepts
+
+
+def anomalies_fixture() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "year": [2024],
+            "state_abbr": ["AL"],
+            "concept": ["mail_returned"],
+            "note": ["fixture note"],
+            "source": ["fixture source"],
+        }
+    )
+
+
+def test_known_anomaly_flags_every_reported_observation():
+    d = pd.concat(
+        [panel_1y(mail_returned=100.0), panel_1y(mail_returned=200.0)],
+        ignore_index=True,
+    )
+    f = tidyeavs.flags(
+        d, checks=None, swing_factor=None, anomalies=anomalies_fixture()
+    )
+    assert len(f) == 2
+    assert set(f["check"]) == {"known_anomaly"}
+    assert set(f["kind"]) == {"known_anomaly"}
+    assert sorted(f["observed"]) == [100.0, 200.0]
+    assert f["threshold"].isna().all()
+    assert f["excess"].isna().all()
+    assert set(f["note"]) == {"fixture note"}
+
+
+def test_known_anomaly_skips_other_states_years_and_na():
+    other_state = panel_1y(mail_returned=100.0).assign(state_abbr="GA")
+    other_year = panel_1y(mail_returned=100.0).assign(year=2022)
+    no_value = panel_1y(mail_returned=np.nan)
+    for d in (other_state, other_year, no_value):
+        f = tidyeavs.flags(
+            d, checks=None, swing_factor=None, anomalies=anomalies_fixture()
+        )
+        assert len(f) == 0
+
+
+def test_anomalies_none_skips_them():
+    d = panel_1y(mail_returned=100.0)
+    f = tidyeavs.flags(d, checks=None, swing_factor=None, anomalies=None)
+    assert len(f) == 0
+
+
+def test_shipped_anomalies_are_well_formed():
+    a = tidyeavs.known_anomalies()
+    assert len(a) > 0
+    concepts = set(tidyeavs.dictionary()["concept"])
+    assert set(a["concept"]) <= concepts
+    assert a["note"].notna().all()
+    assert a["source"].notna().all()
+    assert not a[["year", "state_abbr", "concept"]].duplicated().any()
+
+
+def alameda_panel() -> pd.DataFrame:
+    # Alameda CA: 10 digits in 2022, 9 in 2024. The jurisdiction table's fips10
+    # is what makes these the same jurisdiction.
+    return pd.DataFrame(
+        {
+            "year": [2022, 2024],
+            "fips_code": ["0600100000", "600100000"],
+            "state_abbr": ["CA", "CA"],
+            "jurisdiction_name": ["ALAMEDA COUNTY", "ALAMEDA COUNTY"],
+            "mail_returned": [100.0, 5000.0],
+        }
+    )
+
+
+def test_swings_line_up_a_code_that_lost_a_leading_zero():
+    jur = pd.DataFrame(
+        {
+            "year": pd.array([2022, 2024], dtype="Int64"),
+            "fips_code": pd.array(["0600100000", "600100000"], dtype="string"),
+            "fips10": pd.array(["0600100000", "0600100000"], dtype="string"),
+        }
+    )
+    f = tidyeavs.flags(
+        alameda_panel(), checks=None, anomalies=None, jurisdictions=jur
+    )
+    assert len(f) == 1
+    assert f["check"].iloc[0] == "year_over_year_swing"
+
+    # Without the normalization the two rows look like different jurisdictions.
+    raw = jur.assign(fips10=pd.array([None, None], dtype="string"))
+    with pytest.warns(UserWarning, match="not swing-checked"):
+        f0 = tidyeavs.flags(
+            alameda_panel(), checks=None, anomalies=None, jurisdictions=raw
+        )
+    assert len(f0) == 0
+
+
+def test_shared_code_is_not_compared_against_the_wrong_row():
+    # Wisconsin publishes one serial for a town/village pair in some years.
+    d = pd.DataFrame(
+        {
+            "year": [2020, 2020, 2022],
+            "fips_code": ["82575"] * 3,
+            "state_abbr": ["WI"] * 3,
+            "jurisdiction_name": [
+                "TOWN OF VERNON",
+                "VILLAGE OF VERNON",
+                "TOWN OF VERNON",
+            ],
+            "mail_returned": [100.0, 5000.0, 5000.0],
+        }
+    )
+    jur = pd.DataFrame(
+        {
+            "year": pd.array([2020, 2020, 2022], dtype="Int64"),
+            "fips_code": pd.array(["82575"] * 3, dtype="string"),
+            "fips10": pd.array([None] * 3, dtype="string"),
+        }
+    )
+    f = tidyeavs.flags(d, checks=None, anomalies=None, jurisdictions=jur)
+    # TOWN OF VERNON 100 -> 5000 is a real 50-fold swing; the village must not
+    # be the one credited with it.
+    assert len(f) == 1
+    assert f["jurisdiction_name"].iloc[0] == "TOWN OF VERNON"
+    assert f["threshold"].iloc[0] == 100

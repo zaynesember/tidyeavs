@@ -15,7 +15,10 @@ find.
 from __future__ import annotations
 
 # Known sentinel codes mapped to a status label. Codes not listed here but
-# still negative are treated as ``other_missing``.
+# still negative are treated as ``other_missing``. That includes -88888 (five
+# 8s; 480 occurrences, all 2016 Maine, mostly F7d booth/counter items):
+# plausibly a truncated -888888, but unattested in the codebook, so it stays
+# unrecognized rather than guessed at (decided 2026-07-30).
 SENTINELS: dict[str, str] = {
     "-88": "does_not_apply",
     "-99": "not_available",
@@ -67,3 +70,8 @@ STATUS_LEVELS: tuple[str, ...] = (
 
 SURVEYS: tuple[str, ...] = ("eavs", "policy")
 FORMATS: tuple[str, ...] = ("csv", "xlsx")
+
+# Territories that file EAVS rows. State-level output is not all states: these
+# five and DC file too, and a 50-state analysis needs to see which is which
+# without memorizing the codes. Mirrors .eavs_territories in r/R/utils.R.
+TERRITORIES: tuple[str, ...] = ("AS", "GU", "MP", "PR", "VI")

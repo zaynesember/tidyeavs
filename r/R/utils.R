@@ -7,7 +7,10 @@
 # is a sentinel, not data. See `eavs_recode_missing()`.
 #
 # Named vector mapping known sentinel codes to a status label. Codes not
-# listed here but still negative are treated as `other_missing`.
+# listed here but still negative are treated as `other_missing`. That includes
+# -88888 (five 8s; 480 occurrences, all 2016 Maine, mostly F7d booth/counter
+# items): plausibly a truncated -888888, but unattested in the codebook, so it
+# stays unrecognized rather than guessed at (decided 2026-07-30).
 .eavs_sentinels <- c(
   "-88"      = "does_not_apply",
   "-99"      = "not_available",
@@ -52,6 +55,17 @@
   "reported", "does_not_apply", "not_available",
   "valid_skip", "other_missing", "blank"
 )
+
+# Territories that file EAVS rows. State-level output is not all states: these
+# five and DC file too, and a 50-state analysis needs to see which is which
+# without memorizing the codes. Mirrored as TERRITORIES in _constants.py.
+.eavs_territories <- c("AS", "GU", "MP", "PR", "VI")
+
+# Classify a state_abbr for the entity_type column in eavs_aggregate() output.
+entity_type_of <- function(state_abbr) {
+  ifelse(state_abbr %in% .eavs_territories, "territory",
+         ifelse(state_abbr == "DC", "district", "state"))
+}
 
 # The 2016 EAVS writes sentinels as "CODE: Label" (e.g.
 # "-999999: Data Not Available"). Reduce such a value to its numeric code so

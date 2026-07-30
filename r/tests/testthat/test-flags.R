@@ -163,3 +163,102 @@ test_that("the shipped checks are well formed", {
     expect_false(eavs_checks$total[i] %in% eavs_checks$parts[[i]])
   }
 })
+
+anomalies_fixture <- function() {
+  tibble::tibble(
+    year = 2024L, state_abbr = "AL", concept = "mail_returned",
+    note = "fixture note", source = "fixture source"
+  )
+}
+
+test_that("a known anomaly flags every reported observation in its state-year", {
+  d <- rbind(panel_1y(mail_returned = 100),
+             panel_1y(mail_returned = 200))
+  f <- eavs_flags(d, checks = NULL, swing_factor = NULL,
+                  anomalies = anomalies_fixture())
+  expect_equal(nrow(f), 2)
+  expect_equal(unique(f$check), "known_anomaly")
+  expect_equal(unique(f$kind), "known_anomaly")
+  expect_equal(f$observed, c(100, 200))
+  expect_true(all(is.na(f$threshold)))
+  expect_true(all(is.na(f$excess)))
+  expect_equal(unique(f$note), "fixture note")
+})
+
+test_that("a known anomaly skips other states, other years, and NA values", {
+  other_state <- panel_1y(mail_returned = 100)
+  other_state$state_abbr <- "GA"
+  other_year <- panel_1y(mail_returned = 100)
+  other_year$year <- 2022L
+  no_value <- panel_1y(mail_returned = NA_real_)
+  for (d in list(other_state, other_year, no_value)) {
+    f <- eavs_flags(d, checks = NULL, swing_factor = NULL,
+                    anomalies = anomalies_fixture())
+    expect_equal(nrow(f), 0)
+  }
+})
+
+test_that("anomalies = NULL skips known anomalies", {
+  d <- panel_1y(mail_returned = 100)
+  f <- eavs_flags(d, checks = NULL, swing_factor = NULL, anomalies = NULL)
+  expect_equal(nrow(f), 0)
+})
+
+test_that("the shipped anomalies are well formed and name real concepts", {
+  expect_true(nrow(eavs_known_anomalies) > 0)
+  expect_true(all(eavs_known_anomalies$concept %in% eavs_dictionary$concept))
+  expect_false(any(is.na(eavs_known_anomalies$note)))
+  expect_false(any(is.na(eavs_known_anomalies$source)))
+  key <- paste(eavs_known_anomalies$year, eavs_known_anomalies$state_abbr,
+               eavs_known_anomalies$concept)
+  expect_false(any(duplicated(key)))
+})
+
+test_that("swings line up a jurisdiction whose published code lost a leading zero", {
+  # Alameda CA: 10 digits in 2022, 9 in 2024. The jurisdiction table's fips10
+  # is what makes these the same jurisdiction.
+  d <- tibble::tibble(
+    year = c(2022L, 2024L),
+    fips_code = c("0600100000", "600100000"),
+    state_abbr = c("CA", "CA"),
+    jurisdiction_name = c("ALAMEDA COUNTY", "ALAMEDA COUNTY"),
+    mail_returned = c(100, 5000)
+  )
+  jur <- tibble::tibble(
+    year = c(2022L, 2024L),
+    fips_code = c("0600100000", "600100000"),
+    fips10 = c("0600100000", "0600100000")
+  )
+  f <- eavs_flags(d, checks = NULL, anomalies = NULL, jurisdictions = jur)
+  expect_equal(nrow(f), 1)
+  expect_equal(f$check, "year_over_year_swing")
+
+  # Without the normalization the two rows look like different jurisdictions.
+  raw <- tibble::tibble(year = jur$year, fips_code = jur$fips_code,
+                        fips10 = c(NA_character_, NA_character_))
+  expect_message(
+    f0 <- eavs_flags(d, checks = NULL, anomalies = NULL, jurisdictions = raw),
+    "not swing-checked"
+  )
+  expect_equal(nrow(f0), 0)
+})
+
+test_that("a code shared by two rows is not compared against the wrong row", {
+  # Wisconsin publishes one serial for a town/village pair in some years.
+  d <- tibble::tibble(
+    year = c(2020L, 2020L, 2022L),
+    fips_code = c("82575", "82575", "82575"),
+    state_abbr = c("WI", "WI", "WI"),
+    jurisdiction_name = c("TOWN OF VERNON", "VILLAGE OF VERNON", "TOWN OF VERNON"),
+    mail_returned = c(100, 5000, 5000)
+  )
+  jur <- tibble::tibble(year = c(2020L, 2020L, 2022L),
+                       fips_code = c("82575", "82575", "82575"),
+                       fips10 = rep(NA_character_, 3))
+  f <- eavs_flags(d, checks = NULL, anomalies = NULL, jurisdictions = jur)
+  # TOWN OF VERNON 100 -> 5000 is a real 50-fold swing; the village must not be
+  # the one credited with it.
+  expect_equal(nrow(f), 1)
+  expect_equal(f$jurisdiction_name, "TOWN OF VERNON")
+  expect_equal(f$threshold, 100)
+})

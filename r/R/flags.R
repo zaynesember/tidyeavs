@@ -1,9 +1,11 @@
 #' Flag internal inconsistencies in an EAVS panel
 #'
 #' Runs a set of arithmetic checks over a harmonized panel and returns one row
-#' per flagged observation. Two kinds: subparts summing past a total (see
-#' [eavs_checks]), and a value swinging by more than `swing_factor` against the
-#' same jurisdiction's previous cycle.
+#' per flagged observation. Three kinds: subparts summing past a total (see
+#' [eavs_checks]), a value swinging by more than `swing_factor` against the same
+#' jurisdiction's previous cycle, and the reporting anomalies recorded in
+#' [eavs_known_anomalies], which arithmetic cannot catch because the numbers
+#' reconcile internally.
 #'
 #' @section These are flags, not errors:
 #' A flag says two reported numbers do not reconcile arithmetically. It does not
@@ -32,6 +34,10 @@
 #' sum that already exceeds the total is still a genuine flag, since the absent
 #' parts could only add to it.
 #'
+#' For a known anomaly there is no comparison, only a documented reason to read
+#' the value with the `note` in hand, so `observed` is the reported value and
+#' `threshold`, `excess`, and `n_parts_reported` are `NA`.
+#'
 #' @param data A harmonized panel from [eavs_load()]. Needs `year` and, for
 #'   swing checks, more than one year.
 #' @param checks The checks to run. Defaults to the bundled [eavs_checks]; pass a
@@ -42,9 +48,15 @@
 #' @param swing_floor Ignore swings where both cycles are below this value, so
 #'   that a count going from 1 to 20 does not dominate the output. Defaults
 #'   to `100`.
+#' @param anomalies The known anomalies to surface. Defaults to the bundled
+#'   [eavs_known_anomalies]; pass your own or set to `NULL` to skip them.
+#' @param jurisdictions The jurisdiction table used to line jurisdictions up
+#'   across years for the swing checks. Defaults to the bundled
+#'   [eavs_jurisdictions].
 #'
 #' @return A tibble with one row per flag: `year`, `fips_code`, `state_abbr`,
-#'   `jurisdiction_name`, `check`, `kind` (`"sum"` or `"swing"`), `concept`,
+#'   `jurisdiction_name`, `check`, `kind` (`"sum"`, `"swing"`, or
+#'   `"known_anomaly"`), `concept`,
 #'   `observed`, `threshold`, `excess`, `n_parts_reported`, and `note`. Zero rows
 #'   if nothing is flagged.
 #' @seealso [eavs_checks] for the check definitions, [eavs_aggregate()] for
@@ -60,12 +72,16 @@
 #' flags[order(-flags$excess), ]
 #' }
 eavs_flags <- function(data, checks = NULL, swing_factor = 10,
-                       swing_floor = 100) {
+                       swing_floor = 100, anomalies = NULL,
+                       jurisdictions = NULL) {
   if (!"year" %in% names(data)) {
     cli::cli_abort("{.arg data} needs a {.field year} column; use {.fn eavs_load}.")
   }
   if (missing(checks)) {
     checks <- eavs_checks
+  }
+  if (missing(anomalies)) {
+    anomalies <- eavs_known_anomalies
   }
 
   out <- list()
@@ -73,7 +89,10 @@ eavs_flags <- function(data, checks = NULL, swing_factor = 10,
     out <- c(out, flag_sums(data, checks))
   }
   if (!is.null(swing_factor)) {
-    out <- c(out, list(flag_swings(data, swing_factor, swing_floor)))
+    out <- c(out, list(flag_swings(data, swing_factor, swing_floor, jurisdictions)))
+  }
+  if (!is.null(anomalies) && nrow(anomalies) > 0) {
+    out <- c(out, flag_known_anomalies(data, anomalies))
   }
 
   res <- dplyr::bind_rows(out)
@@ -91,9 +110,11 @@ eavs_flags <- function(data, checks = NULL, swing_factor = 10,
   }
   # Sort within kind, not across it: `excess` is a count for sum checks and a
   # fold-change for swings, so a global sort would let raw ballot counts bury
-  # every swing.
+  # every swing. Known-anomaly rows have no excess; the -Inf fill keeps them
+  # grouped under their kind instead of order() shunting NA rows to the end.
   res <- res[, cols]
-  tibble::as_tibble(res[order(res$kind, -res$excess), ])
+  ord <- ifelse(is.na(res$excess), -Inf, res$excess)
+  tibble::as_tibble(res[order(res$kind, -ord), ])
 }
 
 # Identifier columns carried onto every flag row, when present.
@@ -145,11 +166,73 @@ flag_sums <- function(data, checks) {
   out
 }
 
+# Verified reporting anomalies: one flag per affected observation, carrying
+# the anomaly's note. Reported values only—a jurisdiction with NA is not
+# carrying the anomalous convention.
+flag_known_anomalies <- function(data, anomalies) {
+  if (!"state_abbr" %in% names(data)) {
+    return(NULL)
+  }
+  out <- list()
+  for (i in seq_len(nrow(anomalies))) {
+    concept <- anomalies$concept[i]
+    if (!concept %in% names(data)) {
+      next
+    }
+    keep <- which(data$year == anomalies$year[i] &
+                    data$state_abbr == anomalies$state_abbr[i] &
+                    !is.na(data[[concept]]))
+    if (length(keep) == 0) {
+      next
+    }
+    res <- flag_ids(data, keep)
+    res$check <- "known_anomaly"
+    res$kind <- "known_anomaly"
+    res$concept <- concept
+    res$observed <- as.numeric(data[[concept]][keep])
+    res$threshold <- NA_real_
+    res$excess <- NA_real_
+    res$n_parts_reported <- NA_integer_
+    res$note <- anomalies$note[i]
+    out[[length(out) + 1]] <- res
+  }
+  out
+}
+
+# Lining a jurisdiction up with itself in the previous cycle. The published
+# code will not do it alone: two 2024 California counties lost a leading zero,
+# Maine's statewide row is "23." then "23", New York and South Dakota each
+# recode a county, and a few Wisconsin serials are shared by two rows in one
+# year. So normalize to fips10 where the jurisdiction table has one, and where
+# a code really is shared, add the name so a village is never silently
+# compared against the town next door.
+swing_keys <- function(data, jurisdictions = NULL) {
+  jur <- if (is.null(jurisdictions)) eavs_jurisdictions else jurisdictions
+  key <- as.character(data$fips_code)
+
+  if (all(c("year", "fips_code", "fips10") %in% names(jur))) {
+    idx <- match(paste(data$year, data$fips_code), paste(jur$year, jur$fips_code))
+    norm <- jur$fips10[idx]
+    key <- ifelse(is.na(norm), key, norm)
+  }
+  if ("jurisdiction_name" %in% names(data)) {
+    # Add the name in *every* year a shared code appears, not only the year it
+    # collides in: the pair is published under one serial in 2020 and
+    # separately in 2022, and a key that changes shape between them would stop
+    # the same town matching itself.
+    collides <- unlist(lapply(split(key, data$year), function(k) k[duplicated(k)]))
+    shared <- key %in% unique(collides)
+    key[shared] <- paste(key[shared], data$jurisdiction_name[shared])
+  }
+  key
+}
+
 # A value swinging hard against the same jurisdiction's previous cycle.
-flag_swings <- function(data, swing_factor, swing_floor) {
+flag_swings <- function(data, swing_factor, swing_floor, jurisdictions = NULL) {
   if (!"fips_code" %in% names(data) || length(unique(data$year)) < 2) {
     return(NULL)
   }
+  keys <- swing_keys(data, jurisdictions)
   concepts <- setdiff(
     names(data)[vapply(data, is.numeric, logical(1))],
     c("year", "survey")
@@ -158,9 +241,20 @@ flag_swings <- function(data, swing_factor, swing_floor) {
 
   out <- list()
   for (k in seq_along(years)[-1]) {
-    now <- data[data$year == years[k], , drop = FALSE]
-    before <- data[data$year == years[k - 1], , drop = FALSE]
-    idx <- match(now$fips_code, before$fips_code)
+    is_now <- data$year == years[k]
+    is_before <- data$year == years[k - 1]
+    now <- data[is_now, , drop = FALSE]
+    before <- data[is_before, , drop = FALSE]
+    idx <- match(keys[is_now], keys[is_before])
+
+    unmatched <- sum(is.na(idx))
+    if (unmatched > 0) {
+      cli::cli_inform(c(
+        "!" = paste("{unmatched} {years[k]} jurisdiction{?s} had no counterpart in",
+                    "{years[k - 1]}, so {?it/they} {?is/are} not swing-checked."),
+        i = "New jurisdictions, and codes shared by two rows in one year, look like this."
+      ))
+    }
 
     for (concept in concepts) {
       a <- now[[concept]]
