@@ -47,8 +47,9 @@ relocating any loose files already listed.
 
 ## Current state
 
-`R CMD check` passes clean (0 errors / 0 warnings / 0 notes). Python: 97 unit
-tests plus 26 that need a populated cache (integration + published-totals). Both verified end to
+`R CMD check` passes clean (0 errors / 0 warnings / 0 notes) at version 0.1.0.
+Python: 136 tests pass, of which 26 need a populated cache (integration +
+published-totals). Both verified end to
 end against the published record (row counts per year, mail-rejection rates
 ~0.8–1.5%, UOCAVA rejection, drop boxes appearing only 2022+).
 
@@ -249,10 +250,18 @@ lands in `n_missing` and `coverage` is a lower bound; `coverage_exact` says whic
 
 Maine's statewide row and the territories are **included** (Zayne's call
 2026-07-30). Checked first: in 2024 no Maine county reports UOCAVA at all, so the
-statewide row is the state's only source and the EPI's "zero it out" would lose
-data rather than prevent double-counting. It does also carry `partic_total`
-6,589 against the counties' 835,858—if county participation already counts
-UOCAVA voters that inflates Maine participation ~0.8%, which is unresolved.
+statewide row is the state's only source and zeroing it outright would lose data
+rather than prevent double-counting. It does also carry `partic_total` 6,589
+against the counties' 835,858, which inflates Maine participation ~0.8%.
+
+**No longer unresolved** (2026-07-31, from reading the EPI port). The EPI does
+*both* halves: `eavs_corrections.R` zeroes the statewide row's registration,
+mail, and participation columns, and separately zeroes the county rows' UOCAVA
+columns. That treats the statewide row as authoritative for UOCAVA and the
+counties as authoritative for everything else, so the ~0.8% is a real
+double-count rather than an open question. tidyeavs still includes both rows and
+corrects neither. A user who wants the EPI's treatment can now follow it step for
+step.
 
 ## `eavs_rate` / `tidyeavs.rate` (done 2026-07-30)
 
@@ -316,7 +325,7 @@ time, same as checks.
 
 **Every sum check has one shape**—the concepts in `parts` must not sum past
 `total`—which covers both orderings (one part) and subparts-versus-total
-(several). The nine checks live in `metadata/checks.csv`, shared so a check
+(several). The eleven checks live in `metadata/checks.csv`, shared so a check
 cannot exist in one language only, and ship as `eavs_checks` /
 `tidyeavs.checks()`. `data-raw/checks.R` validates them against the dictionary,
 so a check naming a concept that does not exist fails the build rather than
@@ -391,7 +400,7 @@ This is the difference between right and wrong, not a refinement. Over all rows
 `uocava_counted / uocava_returned` is **112%** for 2024; on the common subset it
 is **96.4%**, matching the report's "more than 96%". The cause is **Alabama: all
 67 counties report `uocava_counted` and none report `uocava_returned`**, so AL
-adds 132,849 to the numerator and nothing to the denominator. Both suites have a
+adds 131,961 to the numerator and nothing to the denominator. Both suites have a
 test that asserts the naive ratio exceeds 100%, so anyone "simplifying"
 `pair_rate` to a ratio of column sums fails loudly.
 
@@ -405,6 +414,100 @@ Watch two traps when adding figures. `drop_boxes_total` counts **boxes** (14,958
 in 2024), not the "nearly 15 million ballots returned at drop boxes" the report
 mentions in the same breath. And `ballots_cured` is the count *cured*, not the
 585,000 that *entered* the cure process.
+
+## The user test, and what it changed (2026-07-31)
+
+Three agents were given realistic tasks (undergraduate, PhD student, professor)
+and told to work only from user-facing material. The full assessment, including
+which of their claims did not survive checking, is at
+`~/Desktop/claude_scratch/assessment.md`. What shipped from it:
+
+- **`known_anomaly` on `eavs_rate()` and `eavs_aggregate()` output.** The test's
+  most serious finding: Oregon 2018's mail rejection rate comes back with
+  `n_both = 36` and `den_share = 1`, i.e. every county reporting, and is still
+  unusable. The quality columns measure *how many* answered, never whether what
+  they answered is comparable. In `rate` the column names the affected side
+  (`"numerator"`/`"denominator"`/`"both"`, `NA` otherwise) and fires only when
+  `n_both > 0`; in `aggregate` it is logical and fires only when
+  `n_reported > 0`. `anomaly_match()` in `utils.R` and `_anomaly_match()` in
+  `_aggregate.py` are the shared matcher, keyed the same three ways
+  `flag_known_anomalies()` matches. Nothing is withheld or adjusted.
+- **`state_share` on `eavs_flags()` output.** All three testers independently
+  gave up on triaging flags (478, 2,797, and 16,249 rows). `excess` cannot rank
+  them: it is on the concept's own scale, so a large county's small discrepancy
+  outranks a small county's total one. `state_share` is the flagged
+  jurisdiction's share of its state-year total for that concept. **The numerator
+  is `pmax(observed, threshold)`, not the jurisdiction's reported value**, and
+  that detail is the whole point: Utah's Washington County reports 943 mail
+  ballots returned in 2022 against 65,664 counted, so using the reported total
+  called it 0.09% of the state when the county cast 6.5% of Utah's ballots. A
+  `dropped_to_zero` flag is the same problem inverted, its current value being
+  zero by construction. The share can exceed 1 (single-jurisdiction territories
+  on a sum check; a prior-cycle numerator on a swing).
+- **A multi-year nudge from `eavs_load()`** toward `eavs_flags()`, once per load
+  and never on the single-year case, respecting `quiet`.
+- **The rejection-reason blocks, 25 concepts.** Both the grad and the professor
+  landed on these independently as the highest-value gap. 16 mail
+  (`mail_rejected_*`) and 9 provisional (`prov_rejected_*`), 2018–2024, with
+  2016 `NA` (Zayne's call). Plus two checks, `mail_reasons_le_rejected` and
+  `prov_reasons_le_rejected`, which fire on 1.49% of jurisdiction-years.
+- **`eavs_items()` now prefers an exact concept name** over a substring. Adding
+  the reasons made `eavs_items("mail_rejected")`—a documented README
+  example—return 17 concepts. A pre-existing Python test caught it.
+
+**The mail reason block is a permutation, not a block rename, and the old
+vignette text was wrong about it.** Only `C4b`–`C4e` keep their letter from 2020
+to 2022. `C4f` ("No EO Signature") was dropped, three reasons were inserted
+(`C9h` secrecy envelope, `C9k` no postmark, `C9p` eligibility), and everything
+from `f` on shifts: "No Address" runs `C4j`→`C9l` while `C9j` is "Envelope Not
+Sealed", and "No Voter ID" runs `C4n`→`C9o` while `C9n` is "Already Voted". Both
+columns are populated in both cycles, so a hand-mapped series looks fine and is
+wrong. The provisional block is the easy case by contrast: `E2b`–`E2j` →
+`E3b`–`E3j`, letters stable, but `E2` was **reused** for why a provisional was
+*cast*, so `E2e` reads "No ID" in 2020 and "Not Resident of Precinct" in 2024.
+
+2016 is excluded from both blocks for good reasons, not conservatism: it has **no
+mail-reason block at all** (`C4b` is the rejected total, `C4c`/`C4d` are Other
+1/2), and its provisional block is offset one letter from 2018 (no "Total" row)
+with the ID reason worded "insufficient identification".
+
+Verified: `mail_rejected_sig_mismatch` 2024 = 197,979, `_late` = 103,441,
+`_no_voter_sig` = 53,511, matching the three codes the survey-structure vignette
+computes by hand from `C9e`/`C9b`/`C9c`. Curated reasons exceed their total in
+182 of 24,400 jurisdiction-years (0.75%), which is a plausible reporting-
+inconsistency rate rather than a mapping error.
+
+Re-diffed R against Python after all of the above, over three spans including
+the churn span 2020+2022: panels (12,927 × 63 / 12,920 × 68 / 12,921 × 68),
+flags, rate, and aggregate all **0 differing cells** except `note`, whose only
+substitution across all three spans is `eavs_` → `` (the `eavs_missing_status()`
+vs `missing_status()` reference). Version is now **0.1.0** in both
+`r/DESCRIPTION` and `py/pyproject.toml`, and `r/inst/CITATION` cites the package
+and the EAC data and tells the reader to record `RemoteSha` and the manifest
+version.
+
+**Flag volume went up, not down** (2,535 → 2,899 on 2022+2024), because 25 new
+concepts get swing-checked too. That is inherent to curating more; `state_share`
+is the mitigation. Note also that CLAUDE.md's old "2,464 flags over 2022+2024"
+was already stale before this work—the measured figure was 2,535.
+
+**Mined from the EPI port** (`/Users/zaynesember/MEDSL_Git/2024-epi`,
+2026-07-31), which is worth reading before touching EAVS semantics: its
+`R/eavs_rename.R` is an independent 2024 crosswalk that agrees with ours on
+every code we both carry (`A1a`, `A3f`, `B18a`, `C9a`, `E3e`, `D1a`); its
+`mvdecode_eavs()` recognizes exactly our seven sentinels and also declines
+`-88888`, which independently supports leaving it `other_missing`—though it
+matches sentinels *exactly* where we treat any negative as missing, so a stray
+`-88888` would sum into an EPI total and not ours. Two facts worth having:
+`totalPollPl = D3a + D4a` in 2024, i.e. their "polling places" is Election Day
+plus early-voting locations, where our `polling_places_ed` is the Election Day
+part alone. And **their Maine handling answers our open double-count question**:
+`eavs_corrections.R` zeroes the statewide row's registration, mail, and
+participation columns *and* zeroes the county rows' UOCAVA columns, i.e. it
+treats the statewide row as authoritative for UOCAVA and the counties as
+authoritative for everything else. That is the direct answer to the ~0.8%
+participation double-count noted below; we still flag rather than correct, but
+the question is no longer open.
 
 ## Data model
 
@@ -435,13 +538,16 @@ Columns: `concept` (stable snake_case), `concept_label`, `section` (`A`–`F`, o
 `id`), `year`, `code` (raw variable that year, or `NA` if not collected),
 `codebook_label` (that year's label, kept as provenance), `epi_name` (the MIT
 EPI's name), `note` (caveats, especially trap warnings), `confidence`
-(`high`/`medium`/`low`). Curated: 41 concepts spanning registration, mail,
-UOCAVA, provisional, participation, polling places, drop boxes, and curing —
-**not** all ~400 columns. EAVS only for now; the Policy Survey isn't in the
-dictionary yet.
+(`high`/`medium`/`low`). Curated: 66 concepts spanning registration, mail,
+UOCAVA, provisional, participation, polling places, drop boxes, curing, and the
+mail and provisional rejection-reason blocks—**not** all ~400 columns. Four of
+the 66 are identifier rows (`fips_code`, `jurisdiction_name`, `state_abbr`,
+`state_name`), so a user counting data concepts finds 62; say 66 or 62 depending
+on which you mean, and don't quote "41" (pre-2026-07-31). EAVS only for now; the
+Policy Survey isn't in the dictionary yet.
 
 Built from `metadata/concepts.csv` ⋈ `metadata/crosswalk.csv`, filtered to
-`shipped`. A 40th concept, `poll_worker_difficulty`, is curated there with
+`shipped`. One more concept, `poll_worker_difficulty`, is curated there with
 `shipped = FALSE`: its codes are verified but its ordinal encoding changes form
 across years (see below), so it keeps its mapping without being exported.
 

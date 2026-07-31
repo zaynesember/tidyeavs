@@ -7,9 +7,13 @@ avoids.
 
 from __future__ import annotations
 
+from typing import Any
+
+import numpy as np
 import pandas as pd
 
-from ._aggregate import _entity_type, _group_keys
+from . import _metadata
+from ._aggregate import _DEFAULT, _anomaly_match, _entity_type, _group_keys
 
 
 def rate(
@@ -18,16 +22,20 @@ def rate(
     denominator: str,
     by: str = "state",
     jurisdictions: pd.DataFrame | None = None,
+    anomalies: Any = _DEFAULT,
 ) -> pd.DataFrame:
     """Divide one concept by another over the jurisdictions reporting both.
 
     This is how the EAC's own published rates are computed, and the restriction
     matters more than it sounds. In 2024 all 67 Alabama counties report
-    ``uocava_counted`` and none report ``uocava_returned``, so summing each
-    column over every row and dividing gives 112%; on the jurisdictions
-    reporting both it is 96.4%, the figure the EAC publishes. States often
-    report one side of a pair and not the other, and which pairs are affected
-    changes from cycle to cycle.
+    ``uocava_counted`` and none report ``uocava_returned``, so Alabama alone adds
+    131,961 to the national numerator and nothing to the denominator. Summing
+    both columns over every jurisdiction in the country and dividing gives a
+    national rate of 112%; over the jurisdictions reporting both it is 96.4%, the
+    figure the EAC publishes. (Alabama's own ratio is not 112% but undefined,
+    which is what a missing ``rate`` in its row means.) States often report one
+    side of a pair and not the other, and which pairs are affected changes from
+    cycle to cycle.
 
     It also has to happen here rather than afterwards. Once numerator and
     denominator have been summed separately there is no way to tell which
@@ -48,10 +56,24 @@ def rate(
     voting-mode shares, e.g.
     ``rate(panel, "partic_in_person_ed", "partic_total")``.
 
+    **Rates that rest on an anomalous state-year.** The columns above measure
+    *how many* jurisdictions answered, not whether what they reported is
+    comparable, and a rate can be fully supported and still unusable. Oregon's
+    2018 mail rejection rate comes back at 0.009% with ``n_both = 36`` and
+    ``den_share = 1``—every county reporting—because all 36 answered the
+    disposition items for a small subset of ballots that year.
+
+    ``known_anomaly`` says so: missing when neither side is affected, otherwise
+    ``"numerator"``, ``"denominator"``, or ``"both"``, naming which side of the
+    ratio the anomaly touches. It fires when the year, state, and concept appear
+    in :func:`tidyeavs.known_anomalies` and ``n_both`` is above zero, so the rate
+    actually rests on them. Nothing is withheld or adjusted: the rate is still
+    computed and returned. :func:`tidyeavs.flags` carries the reason and the
+    evidence for each one, and the table is short, so absence of a flag is not
+    proof a state-year is comparable.
+
     Nothing is corrected here: the restriction selects rows and counts what it
-    left out. It cannot see values a state reported under an unusual
-    convention, which is what :func:`tidyeavs.flags` is for. ``rate`` is
-    missing when the common-subset denominator is zero.
+    left out. ``rate`` is missing when the common-subset denominator is zero.
     """
     if by not in ("state", "county"):
         raise ValueError(f"by must be 'state' or 'county'; got {by!r}")
@@ -69,6 +91,8 @@ def rate(
             )
     if numerator == denominator:
         raise ValueError("numerator and denominator must differ.")
+    if anomalies is _DEFAULT:
+        anomalies = _metadata.known_anomalies()
 
     keys, keep = _group_keys(data, by, jurisdictions)
     work = keys[keep].copy()
@@ -103,6 +127,24 @@ def rate(
     out["rate"] = (out["num_value"] / out["den_value"]).where(out["den_value"] > 0)
     out["den_share"] = (out["den_value"] / out["_den_all"]).where(out["_den_all"] > 0)
 
+    # A rate can rest on every jurisdiction in the state and still be built on an
+    # anomalous convention, which none of the columns above can show. Name the
+    # side rather than a bare True: only one half of a ratio is usually affected.
+    # Conditioned on n_both, since with no common subset there is no rate to
+    # distrust.
+    has_both = (out["n_both"] > 0).to_numpy()
+    num_anom = (
+        _anomaly_match(out["year"], out["state_abbr"], numerator, anomalies) & has_both
+    )
+    den_anom = (
+        _anomaly_match(out["year"], out["state_abbr"], denominator, anomalies) & has_both
+    )
+    out["known_anomaly"] = np.select(
+        [num_anom & den_anom, num_anom, den_anom],
+        ["both", "numerator", "denominator"],
+        default=None,
+    )
+
     lead = ["year"] + [c for c in group_cols if c != "year"]
     out = out[
         lead
@@ -117,6 +159,7 @@ def rate(
             "n_num_only",
             "n_den_only",
             "den_share",
+            "known_anomaly",
         ]
     ]
     return out.sort_values(lead, kind="mergesort").reset_index(drop=True)

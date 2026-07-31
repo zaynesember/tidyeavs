@@ -24,6 +24,7 @@ COLUMNS = [
     "threshold",
     "excess",
     "n_parts_reported",
+    "state_share",
     "note",
 ]
 
@@ -325,3 +326,66 @@ def test_shared_code_is_not_compared_against_the_wrong_row():
     assert len(f) == 1
     assert f["jurisdiction_name"].iloc[0] == "TOWN OF VERNON"
     assert f["threshold"].iloc[0] == 100
+
+
+# state_share: how much of its state's total for the concept the flagged
+# jurisdiction holds, so a user can sort by what could actually move a number.
+# Mirrors the same block in r/tests/testthat/test-flags.R.
+
+
+def test_state_share_measures_the_jurisdiction_against_its_state():
+    data = pd.DataFrame(
+        {
+            "year": [2024, 2024],
+            "fips_code": ["0100100000", "0100300000"],
+            "state_abbr": ["AL", "AL"],
+            "jurisdiction_name": ["AUTAUGA COUNTY", "BALDWIN COUNTY"],
+            "mail_transmitted": [1000.0, 1000.0],
+            "mail_returned": [100.0, 900.0],  # state total 1000
+            "mail_counted": [80.0, 100.0],
+            "mail_rejected": [40.0, 100.0],  # Autauga: 120 > 100, so it flags
+        }
+    )
+    f = tidyeavs.flags(data, checks=checks_fixture(), swing_factor=None)
+    assert len(f) == 1
+    assert f.iloc[0]["jurisdiction_name"] == "AUTAUGA COUNTY"
+    # Numerator is max(observed, threshold) = 120, not the reported 100, so a
+    # suspiciously small total cannot make a large jurisdiction look immaterial.
+    assert f.iloc[0]["state_share"] == pytest.approx(120 / 1000)
+
+
+def test_state_share_uses_the_larger_side_so_a_drop_to_zero_is_not_hidden():
+    data = pd.DataFrame(
+        {
+            "year": [2022, 2022, 2024, 2024],
+            "fips_code": ["0100100000", "0100300000", "0100100000", "0100300000"],
+            "state_abbr": ["AL"] * 4,
+            "jurisdiction_name": [
+                "AUTAUGA COUNTY",
+                "BALDWIN COUNTY",
+                "AUTAUGA COUNTY",
+                "BALDWIN COUNTY",
+            ],
+            # Autauga falls 500 -> 0 while Baldwin holds steady, so the 2024
+            # state total for the concept is Baldwin's 200 alone.
+            "mail_returned": [500.0, 200.0, 0.0, 200.0],
+        }
+    )
+    f = tidyeavs.flags(data, checks=None, swing_factor=10, swing_floor=100)
+    dz = f[f["check"] == "dropped_to_zero"]
+    assert len(dz) == 1
+    assert dz.iloc[0]["jurisdiction_name"] == "AUTAUGA COUNTY"
+    # This cycle's value is zero by construction, so the prior cycle's 500 is
+    # what says the flag matters. Sorting on `observed` would bury it at zero.
+    assert dz.iloc[0]["state_share"] == pytest.approx(500 / 200)
+
+
+def test_state_share_is_missing_when_the_state_reported_nothing():
+    data = panel_1y(
+        mail_transmitted=100.0, mail_returned=0.0, mail_counted=5.0, mail_rejected=5.0
+    )
+    f = tidyeavs.flags(data, checks=checks_fixture(), swing_factor=None)
+    assert f.iloc[0]["check"] == "disposition_le_returned"
+    # The state's mail_returned total is zero, so there is nothing to be a share
+    # of; missing rather than a division by zero.
+    assert pd.isna(f.iloc[0]["state_share"])

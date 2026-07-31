@@ -26,6 +26,9 @@ def items(
     Use it to answer "what is ``C9a``?", to find the code for a concept in a
     given year, or to see which years collected an item. ``query`` is matched
     case-insensitively against concept names, labels, raw codes, and EPI names.
+    An exact concept name wins outright, so ``"mail_rejected"`` returns that
+    concept rather than it plus the sixteen ``mail_rejected_*`` reasons; search
+    ``"mail_rejected_"`` for the family.
 
     Because the mapping is explicit, the renumbering traps become visible rather
     than silent: ``items("uocava_rejected")`` shows the code is ``B24a`` in 2024
@@ -44,6 +47,13 @@ def items(
         frame = frame[frame["section"].str.lower().isin(lowered)]
 
     if query is not None:
+        # An exact concept name wins outright. Several concepts are prefixes of
+        # others—mail_rejected against the sixteen mail_rejected_* reasons,
+        # prov_rejected against nine—so a substring search alone would answer
+        # "what is the code for mail rejections" with seventeen concepts.
+        exact = frame[frame["concept"].str.lower() == query.lower()]
+        if not exact.empty:
+            return exact.reset_index(drop=True)
         haystack = (
             frame[["concept", "concept_label", "codebook_label", "code", "epi_name"]]
             .fillna("")

@@ -99,3 +99,60 @@ def test_county_rollup_drops_codes_with_no_county():
         )
     assert "county_fips" in out.columns
     assert len(out) == 3
+
+
+# The known_anomaly column. Oregon 2018 is the case it exists for: every county
+# reports, so n_both and den_share both read as perfect support, and the rate is
+# still built on a convention that makes it unusable.
+
+
+def rate_anomalies() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "year": [2024],
+            "state_abbr": ["AL"],
+            "concept": ["mail_rejected"],
+            "note": ["Test fixture."],
+            "source": ["Test fixture."],
+        }
+    )
+
+
+def test_known_anomaly_names_which_side_is_affected():
+    out = tidyeavs.rate(
+        rate_panel(), "mail_rejected", "mail_returned", anomalies=rate_anomalies()
+    )
+    assert row(out, "AL")["known_anomaly"] == "numerator"
+    assert pd.isna(row(out, "ME")["known_anomaly"])
+
+    flip = tidyeavs.rate(
+        rate_panel(), "mail_returned", "mail_rejected", anomalies=rate_anomalies()
+    )
+    assert row(flip, "AL")["known_anomaly"] == "denominator"
+
+
+def test_known_anomaly_is_both_when_each_side_is_covered():
+    anomalies = pd.concat(
+        [rate_anomalies(), rate_anomalies().assign(concept="mail_returned")],
+        ignore_index=True,
+    )
+    out = tidyeavs.rate(
+        rate_panel(), "mail_rejected", "mail_returned", anomalies=anomalies
+    )
+    assert row(out, "AL")["known_anomaly"] == "both"
+
+
+def test_known_anomaly_stays_missing_with_no_common_subset():
+    # With no jurisdiction reporting both sides there is no rate to distrust.
+    panel = rate_panel()
+    panel["mail_returned"] = [None, None, 50.0, 50.0]
+    out = tidyeavs.rate(
+        panel, "mail_rejected", "mail_returned", anomalies=rate_anomalies()
+    )
+    assert row(out, "AL")["n_both"] == 0
+    assert pd.isna(row(out, "AL")["known_anomaly"])
+
+
+def test_anomalies_none_skips_the_lookup():
+    out = tidyeavs.rate(rate_panel(), "mail_rejected", "mail_returned", anomalies=None)
+    assert out["known_anomaly"].isna().all()

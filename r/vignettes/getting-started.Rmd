@@ -20,7 +20,7 @@ library(tidyeavs)
 
 panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024), quiet = TRUE)
 dim(panel)
-#> [1] 32308    43
+#> [1] 32308    68
 ```
 
 One row per jurisdiction per year, with harmonized column names. The first call
@@ -144,23 +144,27 @@ computed from two hundred:
 
 
 ``` r
-thin <- rates[rates$year == 2022 & rates$den_share < 0.10,
+thin <- rates[which(rates$year == 2022 & rates$den_share < 0.10),
               c("state_abbr", "rate", "n_both", "den_share")]
 thin[order(thin$den_share), ]
-#> # A tibble: 5 × 4
+#> # A tibble: 2 × 4
 #>   state_abbr     rate n_both den_share
 #>   <chr>         <dbl>  <int>     <dbl>
 #> 1 AL         NA            0   0      
 #> 2 ID          0.00211      2   0.00369
-#> 3 <NA>       NA           NA  NA      
-#> 4 <NA>       NA           NA  NA      
-#> 5 <NA>       NA           NA  NA
 ```
 
 Idaho's 2022 rate rests on two jurisdictions holding well under 1% of the
 state's mail ballots. The number is arithmetically correct and analytically
 useless. This is the single most valuable habit when working with EAVS: the rate
 and its support are two different facts, and you need both.
+
+Note the `which()`. `den_share` is `NA` for a state that reported no denominator
+at all, and `df[cond, ]` turns each `NA` in the condition into a row of `NA`s
+rather than dropping it, so filtering on a column that can be `NA` invents rows.
+Three states would have appeared here as blanks without it. `which()` drops them,
+`subset()` and `dplyr::filter()` do too, and `is.na(rate)` is the separate check
+for states with no usable rate at all.
 
 ## A national series
 

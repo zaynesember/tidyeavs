@@ -129,12 +129,12 @@ sum(vapply(decoded, is.numeric, logical(1)))
 `eavs_read()` returns the file exactly as published, every column as text, so
 FIPS codes keep their leading zeros. `eavs_recode_missing()` then decodes
 sentinels across every numeric item, whether or not it is in the crosswalk.
-Mail rejection reasons are a good example of something researchers often want:
+Registration forms by source are a good example of something researchers often
+want and the crosswalk does not carry:
 
 ```{r reasons}
-reasons <- c(C9b = "late", C9c = "missing voter signature",
-             C9e = "non-matching signature")
-sapply(names(reasons), function(cd) sum(decoded[[cd]], na.rm = TRUE))
+sources <- c(A4d = "automatic", A4e = "motor vehicle", A4f = "public assistance")
+sapply(names(sources), function(cd) sum(decoded[[cd]], na.rm = TRUE))
 ```
 
 `eavs_missing_status()` works on these too, and once a column is attached to a
@@ -143,15 +143,30 @@ numeric column:
 
 ```{r attach}
 tidy <- eavs_harmonize(decoded, year = 2024)
-tidy$rejected_late <- decoded$C9b[match(tidy$fips_code, raw$FIPSCode)]
-head(eavs_rate(tidy, "rejected_late", "mail_rejected")[, c("state_abbr", "rate", "n_both")], 3)
+tidy$automatic_reg <- decoded$A4d[match(tidy$fips_code, raw$FIPSCode)]
+head(eavs_rate(tidy, "automatic_reg", "reg_forms_received")[, c("state_abbr", "rate", "n_both")], 3)
 ```
 
-What you do not get is the cross-year work. You have to find each year's code
-yourself, and the traps above are live: mail rejection reasons are `C4b`–`C4l` in
-2018 and 2020 but `C9b`–`C9l` from 2022, and `C4b` means a drop-box count in the
-later years. The 2016 file is a bigger step, with different column naming
-throughout:
+That `match()` is safe here only because no 2024 code is shared. In 2020 and 2022
+three Wisconsin town/village pairs share a published code, and `match()` would
+hand both rows the first one's value. For those years, attach by row position
+instead. `eavs_read()` returns rows in the same order the harmonized panel does,
+and that holds whether or not the codes are unique.
+
+What you do not get is the cross-year work, and the traps above are live there
+with nothing to catch them. It is worse than a prefix change. Between 2020 and
+2022 the mail rejection reasons moved from `C4` to `C9` and *permuted*: only `b`
+through `e` keep their letter, so the "No Address" reason runs `C4j` then `C9l`,
+while `C9j` is "Envelope Not Sealed" and `C9k` is a reason that did not exist
+before. Carrying `C4j` forward as `C9j` silently swaps one for the other, and
+both columns are populated, so nothing looks wrong. The provisional block moved
+`E2` to `E3` and `E2` was reused for why a ballot was *cast*, so `E2e` reads
+"No ID" in 2020 and "Not Resident of Precinct" in 2024.
+
+Both of those blocks are now in the crosswalk (`eavs_items("mail_rejected_")`
+and `eavs_items("prov_rejected_")`), which is the argument for putting a concept
+there rather than tracking it by hand. The 2016 file is a bigger step again, with
+different column naming throughout:
 
 ```{r naming}
 c(cols_2016 = ncol(eavs_read(2016, quiet = TRUE)), cols_2024 = ncol(raw))
@@ -159,9 +174,15 @@ grep("^A2", names(eavs_read(2016, quiet = TRUE)), value = TRUE)
 grep("^A2", names(raw), value = TRUE)
 ```
 
-Same-day registration is `A2a` from 2018 on, but in 2016 the item is `A4a`, and
-`A4a` in later years means mail registration forms. If you are doing single-year
-work on an uncurated item, the package already handles the hard part. If you are
-building a cross-year series from one, verify each year's code against that
-year's codebook, and consider whether the concept belongs in the crosswalk
-instead.
+Registration sources are `A4a`–`A4n` from 2018 on, but `A4a` in 2016 is same-day
+registration, an unrelated item. If you are doing single-year work on an
+uncurated item, the package already handles the hard part. If you are building a
+cross-year series from one, verify each year's code against that year's codebook
+rather than against the neighbouring year, and consider whether the concept
+belongs in the crosswalk instead.
+
+One thing the package does not give you for these columns is a label. Only
+crosswalked concepts carry `codebook_label`, so identifying `A4d` in each cycle
+means opening the EAC's codebook for that cycle, a separate document per year
+from <https://www.eac.gov/research-and-data/datasets-codebooks-and-surveys>.
+There is no `confidence` rating on a judgment you make yourself, either.

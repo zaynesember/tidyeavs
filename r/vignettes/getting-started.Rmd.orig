@@ -110,7 +110,7 @@ matter, because a rate computed from two jurisdictions prints exactly like one
 computed from two hundred:
 
 ```{r thin}
-thin <- rates[rates$year == 2022 & rates$den_share < 0.10,
+thin <- rates[which(rates$year == 2022 & rates$den_share < 0.10),
               c("state_abbr", "rate", "n_both", "den_share")]
 thin[order(thin$den_share), ]
 ```
@@ -119,6 +119,13 @@ Idaho's 2022 rate rests on two jurisdictions holding well under 1% of the
 state's mail ballots. The number is arithmetically correct and analytically
 useless. This is the single most valuable habit when working with EAVS: the rate
 and its support are two different facts, and you need both.
+
+Note the `which()`. `den_share` is `NA` for a state that reported no denominator
+at all, and `df[cond, ]` turns each `NA` in the condition into a row of `NA`s
+rather than dropping it, so filtering on a column that can be `NA` invents rows.
+Three states would have appeared here as blanks without it. `which()` drops them,
+`subset()` and `dplyr::filter()` do too, and `is.na(rate)` is the separate check
+for states with no usable rate at all.
 
 ## A national series
 

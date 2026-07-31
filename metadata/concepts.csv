@@ -41,3 +41,28 @@ partic_in_person_ed,F,Voters: in person on Election Day,partic_PollPl,TRUE
 partic_provisional,F,Voters: provisional (credited),partic_Prov,TRUE
 partic_total,F,Total voter participation,totalPartic,TRUE
 partic_uocava,F,Voters: UOCAVA (absentee) ballot,partic_Abs,TRUE
+mail_rejected_late,C,Mail ballots rejected: arrived after the deadline,domRej_Late,TRUE
+mail_rejected_no_voter_sig,C,Mail ballots rejected: missing voter signature,domRej_NoVoterSig,TRUE
+mail_rejected_no_witness_sig,C,Mail ballots rejected: missing witness signature,domRej_NoWitSig,TRUE
+mail_rejected_sig_mismatch,C,Mail ballots rejected: non-matching signature,domRej_NonMatch,TRUE
+mail_rejected_unofficial_env,C,Mail ballots rejected: unofficial envelope,domRej_WrongEnv,TRUE
+mail_rejected_ballot_missing,C,Mail ballots rejected: ballot missing from envelope,domRej_Missing,TRUE
+mail_rejected_multiple_ballots,C,Mail ballots rejected: multiple ballots in one envelope,domRej_MultiBall,TRUE
+mail_rejected_env_not_sealed,C,Mail ballots rejected: envelope not sealed,domRej_NotSealed,TRUE
+mail_rejected_no_address,C,Mail ballots rejected: no resident address on envelope,domRej_NoAddress,TRUE
+mail_rejected_deceased,C,Mail ballots rejected: voter deceased,domRej_Deceased,TRUE
+mail_rejected_already_voted,C,Mail ballots rejected: voter already voted,domRej_Voted,TRUE
+mail_rejected_no_id,C,Mail ballots rejected: missing identification or documentation,domRej_NoId,TRUE
+mail_rejected_no_application,C,Mail ballots rejected: no ballot application,domRej_NoApp,TRUE
+mail_rejected_no_secrecy_env,C,Mail ballots rejected: no secrecy envelope,domRej_NoSecrecy,TRUE
+mail_rejected_no_postmark,C,Mail ballots rejected: no postmark,domRej_NoMark,TRUE
+mail_rejected_not_eligible,C,Mail ballots rejected: voter not eligible,domRej_Inel,TRUE
+prov_rejected_not_registered,E,Provisional ballots rejected: voter not registered,provRej_NoReg,TRUE
+prov_rejected_wrong_juris,E,Provisional ballots rejected: wrong jurisdiction,provRej_WrongJuris,TRUE
+prov_rejected_wrong_precinct,E,Provisional ballots rejected: wrong precinct,provRej_WrongPrec,TRUE
+prov_rejected_no_id,E,Provisional ballots rejected: no identification,provRej_NoId,TRUE
+prov_rejected_incomplete,E,Provisional ballots rejected: envelope or ballot incomplete,provRej_Incomp,TRUE
+prov_rejected_ballot_missing,E,Provisional ballots rejected: ballot missing from envelope,provRej_Missing,TRUE
+prov_rejected_no_signature,E,Provisional ballots rejected: no signature,provRej_NoVoterSig,TRUE
+prov_rejected_sig_mismatch,E,Provisional ballots rejected: non-matching signature,provRej_NonMatch,TRUE
+prov_rejected_already_voted,E,Provisional ballots rejected: voter already voted,provRej_Voted,TRUE

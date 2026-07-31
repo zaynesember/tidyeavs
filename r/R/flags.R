@@ -34,6 +34,26 @@
 #' sum that already exceeds the total is still a genuine flag, since the absent
 #' parts could only add to it.
 #'
+#' `state_share` is roughly how much of its state's total for that concept the
+#' flagged jurisdiction holds, and it is the column to sort by when the question
+#' is whether a flag could move a number you plan to publish. A discrepancy in a
+#' jurisdiction holding 0.2% of the state's mail ballots cannot; one holding 40%
+#' can. `excess` will not tell you this, because it is measured on the concept's
+#' own scale: a large county's small discrepancy outranks a small county's
+#' complete one.
+#'
+#' The numerator is the larger of `observed` and `threshold`, since the smaller
+#' one is often the reason the flag fired. Utah's Washington County reports 943
+#' mail ballots returned in 2022 against 65,664 counted, so taking the reported
+#' total would call it 0.09% of the state when the county cast 6.5% of Utah's
+#' ballots. The share can therefore run above 1. That happens on a sum check
+#' where the suspect total is most of what the state reported (the Virgin Islands
+#' file as a single jurisdiction), and on a swing where the larger number belongs
+#' to the previous cycle while the denominator belongs to this one.
+#'
+#' `state_share` measures size, not severity. What a flag means for your analysis
+#' is still yours to decide.
+#'
 #' For a known anomaly there is no comparison, only a documented reason to read
 #' the value with the `note` in hand, so `observed` is the reported value and
 #' `threshold`, `excess`, and `n_parts_reported` are `NA`.
@@ -57,8 +77,8 @@
 #' @return A tibble with one row per flag: `year`, `fips_code`, `state_abbr`,
 #'   `jurisdiction_name`, `check`, `kind` (`"sum"`, `"swing"`, or
 #'   `"known_anomaly"`), `concept`,
-#'   `observed`, `threshold`, `excess`, `n_parts_reported`, and `note`. Zero rows
-#'   if nothing is flagged.
+#'   `observed`, `threshold`, `excess`, `n_parts_reported`, `state_share`, and
+#'   `note`. Zero rows if nothing is flagged.
 #' @seealso [eavs_checks] for the check definitions, [eavs_aggregate()] for
 #'   coverage-aware rollups.
 #' @export
@@ -70,6 +90,11 @@
 #'
 #' # Largest discrepancies first:
 #' flags[order(-flags$excess), ]
+#'
+#' # Or the ones big enough to move a state number:
+#' sums <- flags[flags$kind == "sum", ]
+#' head(sums[order(-sums$state_share), c("state_abbr", "jurisdiction_name",
+#'                                       "check", "state_share")])
 #' }
 eavs_flags <- function(data, checks = NULL, swing_factor = 10,
                        swing_floor = 100, anomalies = NULL,
@@ -98,16 +123,18 @@ eavs_flags <- function(data, checks = NULL, swing_factor = 10,
   res <- dplyr::bind_rows(out)
   cols <- c("year", "fips_code", "state_abbr", "jurisdiction_name", "check",
             "kind", "concept", "observed", "threshold", "excess",
-            "n_parts_reported", "note")
+            "n_parts_reported", "state_share", "note")
   if (nrow(res) == 0) {
     empty <- lapply(cols, function(x) switch(
       x,
       year = integer(), observed = numeric(), threshold = numeric(),
-      excess = numeric(), n_parts_reported = integer(), character()
+      excess = numeric(), n_parts_reported = integer(),
+      state_share = numeric(), character()
     ))
     names(empty) <- cols
     return(tibble::as_tibble(empty))
   }
+  res$state_share <- flag_state_share(data, res)
   # Sort within kind, not across it: `excess` is a count for sum checks and a
   # fold-change for swings, so a global sort would let raw ballot counts bury
   # every swing. Known-anomaly rows have no excess; the -Inf fill keeps them
@@ -115,6 +142,39 @@ eavs_flags <- function(data, checks = NULL, swing_factor = 10,
   res <- res[, cols]
   ord <- ifelse(is.na(res$excess), -Inf, res$excess)
   tibble::as_tibble(res[order(res$kind, -ord), ])
+}
+
+# How big is this jurisdiction, in this concept, within its state-year? A flag on
+# a jurisdiction holding 0.1% of the state's mail ballots cannot move a state
+# number; one holding 40% can, and nothing else in the output distinguishes them:
+# `excess` is on the concept's own scale, so it ranks a large county's small
+# discrepancy above a small county's total one.
+#
+# The numerator is the larger of the two numbers already on the row, because the
+# smaller one is often the reason the flag fired and would hide a large
+# jurisdiction. Utah's Washington County reports 943 mail ballots returned in
+# 2022 against 65,664 counted: taking the reported total would call it 0.09% of
+# the state when the county cast 6.5% of Utah's ballots. A dropped_to_zero flag
+# is the same problem in the other direction, its current value being zero by
+# construction. Grouping on year + state_abbr rather than fips_code keeps the
+# Wisconsin serials shared by a town/village pair out of it.
+flag_state_share <- function(data, res) {
+  share <- rep(NA_real_, nrow(res))
+  if (!"state_abbr" %in% names(data)) {
+    return(share)
+  }
+  own <- pmax(res$observed, res$threshold, na.rm = TRUE)
+  group <- paste(data$year, data$state_abbr)
+  for (concept in unique(res$concept)) {
+    if (!concept %in% names(data)) {
+      next
+    }
+    totals <- tapply(as.numeric(data[[concept]]), group, sum, na.rm = TRUE)
+    hit <- which(res$concept == concept)
+    denom <- as.numeric(totals[paste(res$year[hit], res$state_abbr[hit])])
+    share[hit] <- ifelse(!is.na(denom) & denom > 0, own[hit] / denom, NA_real_)
+  }
+  share
 }
 
 # Identifier columns carried onto every flag row, when present.

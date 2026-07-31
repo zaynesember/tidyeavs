@@ -80,15 +80,25 @@ d <- eavs_dictionary
 table(d$confidence)
 #> 
 #>   high    low medium 
-#>    201      1      3
+#>    316      1     13
 subset(d, confidence != "high", select = c("concept", "year", "code"))
-#> # A tibble: 4 × 3
-#>   concept             year code 
-#>   <chr>              <int> <chr>
-#> 1 polling_places_ed   2016 <NA> 
-#> 2 partic_by_mail      2016 F1d  
-#> 3 reg_forms_received  2024 A3a  
-#> 4 ballots_cured       2024 C7b
+#> # A tibble: 14 × 3
+#>    concept                     year code 
+#>    <chr>                      <int> <chr>
+#>  1 mail_rejected_no_id         2016 <NA> 
+#>  2 mail_rejected_not_eligible  2016 <NA> 
+#>  3 polling_places_ed           2016 <NA> 
+#>  4 partic_by_mail              2016 F1d  
+#>  5 mail_rejected_no_id         2018 C4n  
+#>  6 mail_rejected_not_eligible  2018 <NA> 
+#>  7 mail_rejected_no_id         2020 C4n  
+#>  8 mail_rejected_not_eligible  2020 <NA> 
+#>  9 mail_rejected_no_id         2022 C9o  
+#> 10 mail_rejected_not_eligible  2022 C9p  
+#> 11 reg_forms_received          2024 A3a  
+#> 12 ballots_cured               2024 C7b  
+#> 13 mail_rejected_no_id         2024 C9o  
+#> 14 mail_rejected_not_eligible  2024 C9p
 ```
 
 ## Jurisdictions are not counties
@@ -184,15 +194,15 @@ sum(vapply(decoded, is.numeric, logical(1)))
 `eavs_read()` returns the file exactly as published, every column as text, so
 FIPS codes keep their leading zeros. `eavs_recode_missing()` then decodes
 sentinels across every numeric item, whether or not it is in the crosswalk.
-Mail rejection reasons are a good example of something researchers often want:
+Registration forms by source are a good example of something researchers often
+want and the crosswalk does not carry:
 
 
 ``` r
-reasons <- c(C9b = "late", C9c = "missing voter signature",
-             C9e = "non-matching signature")
-sapply(names(reasons), function(cd) sum(decoded[[cd]], na.rm = TRUE))
-#>    C9b    C9c    C9e 
-#> 103441  53511 197979
+sources <- c(A4d = "automatic", A4e = "motor vehicle", A4f = "public assistance")
+sapply(names(sources), function(cd) sum(decoded[[cd]], na.rm = TRUE))
+#>      A4d      A4e      A4f 
+#> 26099956 31829586   996390
 ```
 
 `eavs_missing_status()` works on these too, and once a column is attached to a
@@ -202,21 +212,36 @@ numeric column:
 
 ``` r
 tidy <- eavs_harmonize(decoded, year = 2024)
-tidy$rejected_late <- decoded$C9b[match(tidy$fips_code, raw$FIPSCode)]
-head(eavs_rate(tidy, "rejected_late", "mail_rejected")[, c("state_abbr", "rate", "n_both")], 3)
+tidy$automatic_reg <- decoded$A4d[match(tidy$fips_code, raw$FIPSCode)]
+head(eavs_rate(tidy, "automatic_reg", "reg_forms_received")[, c("state_abbr", "rate", "n_both")], 3)
 #> # A tibble: 3 × 3
 #>   state_abbr   rate n_both
 #>   <chr>       <dbl>  <int>
-#> 1 AK          0.169      1
+#> 1 AK          0.750      1
 #> 2 AL         NA          0
-#> 3 AR          0.209     62
+#> 3 AR         NA          0
 ```
 
-What you do not get is the cross-year work. You have to find each year's code
-yourself, and the traps above are live: mail rejection reasons are `C4b`–`C4l` in
-2018 and 2020 but `C9b`–`C9l` from 2022, and `C4b` means a drop-box count in the
-later years. The 2016 file is a bigger step, with different column naming
-throughout:
+That `match()` is safe here only because no 2024 code is shared. In 2020 and 2022
+three Wisconsin town/village pairs share a published code, and `match()` would
+hand both rows the first one's value. For those years, attach by row position
+instead. `eavs_read()` returns rows in the same order the harmonized panel does,
+and that holds whether or not the codes are unique.
+
+What you do not get is the cross-year work, and the traps above are live there
+with nothing to catch them. It is worse than a prefix change. Between 2020 and
+2022 the mail rejection reasons moved from `C4` to `C9` and *permuted*: only `b`
+through `e` keep their letter, so the "No Address" reason runs `C4j` then `C9l`,
+while `C9j` is "Envelope Not Sealed" and `C9k` is a reason that did not exist
+before. Carrying `C4j` forward as `C9j` silently swaps one for the other, and
+both columns are populated, so nothing looks wrong. The provisional block moved
+`E2` to `E3` and `E2` was reused for why a ballot was *cast*, so `E2e` reads
+"No ID" in 2020 and "Not Resident of Precinct" in 2024.
+
+Both of those blocks are now in the crosswalk (`eavs_items("mail_rejected_")`
+and `eavs_items("prov_rejected_")`), which is the argument for putting a concept
+there rather than tracking it by hand. The 2016 file is a bigger step again, with
+different column naming throughout:
 
 
 ``` r
@@ -229,9 +254,15 @@ grep("^A2", names(raw), value = TRUE)
 #> [1] "A2a"        "A2b"        "A2c"        "A2Comments"
 ```
 
-Same-day registration is `A2a` from 2018 on, but in 2016 the item is `A4a`, and
-`A4a` in later years means mail registration forms. If you are doing single-year
-work on an uncurated item, the package already handles the hard part. If you are
-building a cross-year series from one, verify each year's code against that
-year's codebook, and consider whether the concept belongs in the crosswalk
-instead.
+Registration sources are `A4a`–`A4n` from 2018 on, but `A4a` in 2016 is same-day
+registration, an unrelated item. If you are doing single-year work on an
+uncurated item, the package already handles the hard part. If you are building a
+cross-year series from one, verify each year's code against that year's codebook
+rather than against the neighbouring year, and consider whether the concept
+belongs in the crosswalk instead.
+
+One thing the package does not give you for these columns is a label. Only
+crosswalked concepts carry `codebook_label`, so identifying `A4d` in each cycle
+means opening the EAC's codebook for that cycle, a separate document per year
+from <https://www.eac.gov/research-and-data/datasets-codebooks-and-surveys>.
+There is no `confidence` rating on a judgment you make yourself, either.

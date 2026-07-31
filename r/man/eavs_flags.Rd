@@ -39,8 +39,8 @@ across years for the swing checks. Defaults to the bundled
 A tibble with one row per flag: \code{year}, \code{fips_code}, \code{state_abbr},
 \code{jurisdiction_name}, \code{check}, \code{kind} (\code{"sum"}, \code{"swing"}, or
 \code{"known_anomaly"}), \code{concept},
-\code{observed}, \code{threshold}, \code{excess}, \code{n_parts_reported}, and \code{note}. Zero rows
-if nothing is flagged.
+\code{observed}, \code{threshold}, \code{excess}, \code{n_parts_reported}, \code{state_share}, and
+\code{note}. Zero rows if nothing is flagged.
 }
 \description{
 Runs a set of arithmetic checks over a harmonized panel and returns one row
@@ -80,6 +80,26 @@ kind before sorting yourself.
 sum that already exceeds the total is still a genuine flag, since the absent
 parts could only add to it.
 
+\code{state_share} is roughly how much of its state's total for that concept the
+flagged jurisdiction holds, and it is the column to sort by when the question
+is whether a flag could move a number you plan to publish. A discrepancy in a
+jurisdiction holding 0.2\% of the state's mail ballots cannot; one holding 40\%
+can. \code{excess} will not tell you this, because it is measured on the concept's
+own scale: a large county's small discrepancy outranks a small county's
+complete one.
+
+The numerator is the larger of \code{observed} and \code{threshold}, since the smaller
+one is often the reason the flag fired. Utah's Washington County reports 943
+mail ballots returned in 2022 against 65,664 counted, so taking the reported
+total would call it 0.09\% of the state when the county cast 6.5\% of Utah's
+ballots. The share can therefore run above 1. That happens on a sum check
+where the suspect total is most of what the state reported (the Virgin Islands
+file as a single jurisdiction), and on a swing where the larger number belongs
+to the previous cycle while the denominator belongs to this one.
+
+\code{state_share} measures size, not severity. What a flag means for your analysis
+is still yours to decide.
+
 For a known anomaly there is no comparison, only a documented reason to read
 the value with the \code{note} in hand, so \code{observed} is the reported value and
 \code{threshold}, \code{excess}, and \code{n_parts_reported} are \code{NA}.
@@ -92,6 +112,11 @@ flags <- eavs_flags(panel)
 
 # Largest discrepancies first:
 flags[order(-flags$excess), ]
+
+# Or the ones big enough to move a state number:
+sums <- flags[flags$kind == "sum", ]
+head(sums[order(-sums$state_share), c("state_abbr", "jurisdiction_name",
+                                      "check", "state_share")])
 }
 }
 \seealso{

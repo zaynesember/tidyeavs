@@ -27,6 +27,12 @@ into a single jurisdiction-year panel. It is the same as running
 \code{\link[=eavs_read]{eavs_read()}}, \code{\link[=eavs_recode_missing]{eavs_recode_missing()}}, and \code{\link[=eavs_harmonize]{eavs_harmonize()}} for each year
 and binding the results.
 }
+\details{
+Loading more than one year prints a one-line reminder to run \code{\link[=eavs_flags]{eavs_flags()}}
+before publishing, because comparing cycles is where the survey's reporting
+changes do their damage and a panel gives no sign of them on its own. \code{quiet}
+silences it.
+}
 \examples{
 \dontrun{
 panel <- eavs_load(c(2020, 2022, 2024))

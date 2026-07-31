@@ -9,7 +9,8 @@ eavs_aggregate(
   status = NULL,
   by = "state",
   concepts = NULL,
-  jurisdictions = NULL
+  jurisdictions = NULL,
+  anomalies = NULL
 )
 }
 \arguments{
@@ -31,12 +32,16 @@ municipalities that straddle county lines include the City of Milwaukee.}
 
 \item{jurisdictions}{The jurisdiction table to join for county codes. Defaults
 to the bundled \link{eavs_jurisdictions}.}
+
+\item{anomalies}{The verified reporting anomalies to mark. Defaults to the
+bundled \link{eavs_known_anomalies}; pass your own or set to \code{NULL} to skip them.}
 }
 \value{
 A tibble with one row per group per concept per year: the grouping
 columns, \code{entity_type} (\code{"state"}, \code{"territory"}, or \code{"district"}, so a
 50-state analysis is one filter), \code{concept}, \code{value}, the five bucket
-counts, \code{n_total}, \code{coverage}, \code{coverage_reg}, and \code{coverage_exact}.
+counts, \code{n_total}, \code{coverage}, \code{coverage_reg}, \code{coverage_exact}, and
+\code{known_anomaly}.
 }
 \description{
 Sums a harmonized panel (see \code{\link[=eavs_load]{eavs_load()}}) to one row per group per concept,
@@ -86,6 +91,17 @@ it you have: in 2024 \code{ballots_cured} comes from 28.5\% of jurisdictions but
 65.9\% of the registered electorate. Jurisdictions with no usable weight leave
 both sides of the ratio, and the column is \code{NA} if the panel carries no
 \code{reg_eligible_total}.
+}
+
+\section{Anomalous state-years}{
+
+\code{known_anomaly} is \code{TRUE} where this year, state, and concept are recorded in
+\link{eavs_known_anomalies} and at least one jurisdiction in the group reported a
+value, so the total rests on the anomalous convention. Coverage cannot tell
+you this: Iowa's 2018 polling places are reported by all 99 counties, so every
+coverage column reads as complete, and the state total is still not comparable
+to its other cycles. The value is summed as reported either way, and what to
+do about it is yours; \code{\link[=eavs_flags]{eavs_flags()}} gives the reason and the evidence.
 }
 
 \section{What is not corrected}{

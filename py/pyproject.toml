@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tidyeavs"
-version = "0.0.1.dev0"
+version = "0.1.0"
 description = "A tidy interface to the EAC's Election Administration and Voting Survey (EAVS)"
 readme = "README.md"
 requires-python = ">=3.9"

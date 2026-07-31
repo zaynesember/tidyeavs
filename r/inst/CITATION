@@ -1,0 +1,37 @@
+# Cite both the package and the data. tidyeavs is a way of reading the EAVS;
+# the survey itself is the EAC's work and the source of every number in it.
+
+citHeader("To cite tidyeavs, cite the package and the EAVS data it reads:")
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "tidyeavs: Tidy Access to Election Administration and Voting Survey Data",
+  author   = person("Zayne", "Sember"),
+  year     = "2026",
+  note     = sprintf("R package version %s", meta$Version),
+  url      = "https://github.com/zaynesember/tidyeavs",
+  textVersion = paste0(
+    "Sember, Zayne (2026). tidyeavs: Tidy Access to Election Administration ",
+    "and Voting Survey Data. R package version ", meta$Version, ". ",
+    "https://github.com/zaynesember/tidyeavs"
+  )
+)
+
+bibentry(
+  bibtype     = "Misc",
+  title       = "Election Administration and Voting Survey",
+  author      = person("U.S. Election Assistance Commission"),
+  year        = "2025",
+  url         = "https://www.eac.gov/research-and-data/datasets-codebooks-and-surveys",
+  textVersion = paste0(
+    "U.S. Election Assistance Commission. Election Administration and Voting ",
+    "Survey. https://www.eac.gov/research-and-data/datasets-codebooks-and-surveys"
+  )
+)
+
+citFooter(paste(
+  "Which published file version an analysis used is recorded in eavs_manifest,",
+  "by SHA-256 checksum; report the version and release_date for the years you",
+  "used. If you installed from GitHub rather than a release, record the commit:",
+  "packageDescription('tidyeavs')$RemoteSha."
+))

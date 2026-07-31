@@ -17,8 +17,8 @@ def test_metadata_dir_is_found():
 
 def test_dictionary_shape():
     d = tidyeavs.dictionary()
-    assert len(d) == 205
-    assert d["concept"].nunique() == 41
+    assert len(d) == 330
+    assert d["concept"].nunique() == 66
     assert list(d.columns) == [
         "concept",
         "concept_label",
@@ -119,7 +119,7 @@ def test_set_metadata_dir_rejects_a_bad_path(tmp_path):
     finally:
         tidyeavs.set_metadata_dir(None)
     # Restored, so the real crosswalk loads again.
-    assert len(tidyeavs.dictionary()) == 205
+    assert len(tidyeavs.dictionary()) == 330
 
 
 def test_wheel_force_include_covers_every_runtime_metadata_file():

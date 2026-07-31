@@ -196,3 +196,38 @@ test_that("a status frame in the wrong year order is an error, not wrong coverag
   expect_equal(nrow(reversed), nrow(panel))   # the row count check cannot see it
   expect_error(eavs_aggregate(panel, status = reversed), "not aligned")
 })
+
+## known_anomaly: a total can rest on an anomalous convention while every
+## coverage column reads as complete, which is exactly Iowa's 2018 polling
+## places (all 99 counties reporting).
+
+test_that("known_anomaly marks totals resting on an anomalous state-year", {
+  an <- tibble::tibble(
+    year = 2024, state_abbr = "AL", concept = "mail_rejected",
+    note = "Test fixture.", source = "Test fixture."
+  )
+  out <- eavs_aggregate(panel_fixture(), anomalies = an)
+  hit <- out$state_abbr == "AL" & out$concept == "mail_rejected"
+  expect_true(all(out$known_anomaly[hit]))
+  expect_false(any(out$known_anomaly[!hit]))
+  # Coverage is unaffected: the column reports, it does not adjust.
+  expect_false(any(is.na(out$coverage[hit])))
+})
+
+test_that("known_anomaly is FALSE where the group reported nothing", {
+  an <- tibble::tibble(
+    year = 2024, state_abbr = "AL", concept = "mail_rejected",
+    note = "Test fixture.", source = "Test fixture."
+  )
+  p <- panel_fixture()
+  p$mail_rejected[p$state_abbr == "AL"] <- NA
+  out <- eavs_aggregate(p, anomalies = an)
+  hit <- out$state_abbr == "AL" & out$concept == "mail_rejected"
+  expect_equal(out$n_reported[hit], 0L)
+  expect_false(any(out$known_anomaly[hit]))
+})
+
+test_that("anomalies = NULL skips the lookup", {
+  out <- eavs_aggregate(panel_fixture(), anomalies = NULL)
+  expect_false(any(out$known_anomaly))
+})

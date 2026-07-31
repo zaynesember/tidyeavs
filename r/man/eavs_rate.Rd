@@ -4,7 +4,14 @@
 \alias{eavs_rate}
 \title{Rates over the jurisdictions that reported both sides}
 \usage{
-eavs_rate(data, numerator, denominator, by = "state", jurisdictions = NULL)
+eavs_rate(
+  data,
+  numerator,
+  denominator,
+  by = "state",
+  jurisdictions = NULL,
+  anomalies = NULL
+)
 }
 \arguments{
 \item{data}{A harmonized panel from \code{\link[=eavs_load]{eavs_load()}}, or one year from
@@ -17,13 +24,19 @@ published code embeds no county, as in \code{\link[=eavs_aggregate]{eavs_aggrega
 
 \item{jurisdictions}{The jurisdiction table to join for county codes.
 Defaults to the bundled \link{eavs_jurisdictions}.}
+
+\item{anomalies}{The verified reporting anomalies to mark. Defaults to the
+bundled \link{eavs_known_anomalies}; pass your own or set to \code{NULL} to skip them.}
 }
 \value{
 A tibble with one row per group per year: the grouping columns,
-\code{entity_type}, \code{numerator}, \code{denominator}, \code{num_value} and \code{den_value}
+\code{entity_type} (\code{"state"}, \code{"territory"}, or \code{"district"}—DC is the one
+district, so a 50-state ranking wants
+\code{entity_type \%in\% c("state", "district")} or neither, deliberately),
+\code{numerator}, \code{denominator}, \code{num_value} and \code{den_value}
 (sums over the common subset), \code{rate}, \code{n_both}, \code{n_num_only},
-\code{n_den_only}, and \code{den_share}. \code{rate} is \code{NA} when the common-subset
-denominator is zero.
+\code{n_den_only}, \code{den_share}, and \code{known_anomaly}. \code{rate} is \code{NA} when the
+common-subset denominator is zero.
 }
 \description{
 Divides one concept by another using only the jurisdictions that reported
@@ -31,11 +44,14 @@ both, which is how the EAC's own published rates are computed.
 }
 \details{
 The restriction matters more than it sounds. In 2024 all 67 Alabama counties
-report \code{uocava_counted} and none report \code{uocava_returned}, so summing each
-column over every row and dividing gives 112\%; on the jurisdictions
-reporting both it is 96.4\%, the figure the EAC publishes. States often
-report one side of a pair and not the other, and which pairs are affected
-changes from cycle to cycle, so this is not a rare edge case.
+report \code{uocava_counted} and none report \code{uocava_returned}, so Alabama alone
+adds 131,961 to the national numerator and nothing to the denominator.
+Summing both columns over every jurisdiction in the country and dividing
+gives a national rate of 112\%; over the jurisdictions reporting both it is
+96.4\%, the figure the EAC publishes. (Alabama's own ratio is not 112\% but
+undefined, which is what \code{rate = NA} in its row means.) States often report
+one side of a pair and not the other, and which pairs are affected changes
+from cycle to cycle, so this is not a rare edge case.
 
 It also has to happen here rather than afterwards. Once numerator and
 denominator have been summed separately there is no way to tell which
@@ -58,8 +74,25 @@ voting-mode shares, e.g.
 \code{eavs_rate(panel, "partic_in_person_ed", "partic_total")}.
 
 Nothing is corrected here: the restriction selects rows and counts what it
-left out. It cannot see values a state reported under an unusual convention,
-which is what \code{\link[=eavs_flags]{eavs_flags()}} is for.
+left out.
+}
+
+\section{Rates that rest on an anomalous state-year}{
+
+The columns above measure how many jurisdictions answered, not whether what
+they reported is comparable, so a rate can be fully supported and still
+unusable. Oregon's 2018 mail rejection rate comes back at 0.009\% with
+\code{n_both = 36} and \code{den_share = 1}, meaning every county reported, because all
+36 answered the disposition items for a small subset of ballots that year.
+
+\code{known_anomaly} says so: \code{NA} when neither side is affected, otherwise
+\code{"numerator"}, \code{"denominator"}, or \code{"both"}, naming which side of the ratio
+the anomaly touches. It fires when the year, state, and concept appear in
+\link{eavs_known_anomalies} and \code{n_both} is above zero, so the rate actually rests
+on them. Nothing is withheld or adjusted: the rate is still computed and
+returned. \code{\link[=eavs_flags]{eavs_flags()}} carries the reason and the evidence for each one, and
+the table is short, so absence of a flag is not proof a state-year is
+comparable.
 }
 
 \examples{
@@ -70,6 +103,11 @@ eavs_rate(panel, "mail_rejected", "mail_returned")
 # Alabama reports the numerator and not the denominator, so its rate is NA.
 r <- eavs_rate(panel, "uocava_counted", "uocava_returned")
 r[r$state_abbr == "AL", ]
+
+# Fully supported and still not comparable: Oregon 2018 has every county
+# reporting, and known_anomaly says the numerator is affected.
+r <- eavs_rate(eavs_load(c(2016, 2018, 2020)), "mail_rejected", "mail_returned")
+r[r$state_abbr == "OR", c("year", "rate", "n_both", "den_share", "known_anomaly")]
 }
 }
 \seealso{

@@ -19,10 +19,11 @@ apart, and on a multi-year panel it is not optional.
 ``` r
 library(tidyeavs)
 
-panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024), quiet = TRUE)
+years <- c(2016, 2018, 2020, 2022, 2024)
+panel <- eavs_load(years, quiet = TRUE)
 flags <- suppressMessages(eavs_flags(panel))
 nrow(flags)
-#> [1] 16249
+#> [1] 17267
 ```
 
 That is a lot of flags, so the first job is triage rather than reading.
@@ -41,7 +42,7 @@ changing, so this count is small on purpose.
 table(flags$kind)
 #> 
 #> known_anomaly           sum         swing 
-#>           171          3492         12586
+#>           171          3809         13287
 ```
 
 A **sum** flag says subparts add up past their total. A **swing** flag says a
@@ -65,8 +66,10 @@ table(mine$check)
 #> 
 #>              dropped_to_zero                known_anomaly 
 #>                           72                           72 
-#> mail_disposition_le_returned         year_over_year_swing 
-#>                          892                         3164
+#> mail_disposition_le_returned     mail_reasons_le_rejected 
+#>                          892                          182 
+#>         year_over_year_swing 
+#>                         3164
 ```
 
 Then read the biggest ones within a kind. `excess` is a ballot count for sum
@@ -161,7 +164,7 @@ tight <- suppressMessages(
   eavs_flags(panel, checks = NULL, anomalies = NULL, swing_factor = 50)
 )
 nrow(tight)
-#> [1] 3189
+#> [1] 3569
 ```
 
 A `dropped_to_zero` flag is split out separately, because a fall to zero would
@@ -193,11 +196,116 @@ rows land in `n_not_collected` rather than `n_missing`, and coverage for that
 year is `NA` rather than zero, so "never asked" and "asked and unanswered" stay
 distinguishable. See `vignette("missingness")`.
 
+## Which flags could actually move your number
+
+Filtering to your concepts still leaves more rows than you can read, and `excess`
+does not rank them usefully across jurisdictions: it is measured in ballots, so a
+large county's small discrepancy outranks a small county's total one. Sort by
+`state_share`, which is how much of its state's total for that concept the
+flagged jurisdiction holds:
+
+
+``` r
+sums <- flags[flags$kind == "sum" & flags$concept == "mail_returned", ]
+head(sums[order(-sums$state_share),
+          c("year", "state_abbr", "jurisdiction_name", "excess", "state_share")], 5)
+#> # A tibble: 5 × 5
+#>    year state_abbr jurisdiction_name excess state_share
+#>   <dbl> <chr>      <chr>              <dbl>       <dbl>
+#> 1  2022 VI         VIRGIN ISLANDS        69       1.15 
+#> 2  2024 VI         VIRGIN ISLANDS         6       1.01 
+#> 3  2022 HI         HONOLULU COUNTY      208       0.662
+#> 4  2016 NM         BERNALILLO COUNTY    261       0.463
+#> 5  2020 NM         BERNALILLO COUNTY   2343       0.445
+```
+
+Compare that ordering with the one `excess` gives:
+
+
+``` r
+head(sums[order(-sums$excess),
+          c("year", "state_abbr", "jurisdiction_name", "excess", "state_share")], 5)
+#> # A tibble: 5 × 5
+#>    year state_abbr jurisdiction_name    excess state_share
+#>   <dbl> <chr>      <chr>                 <dbl>       <dbl>
+#> 1  2018 CA         CONTRA COSTA COUNTY  124329      0.0501
+#> 2  2022 UT         WASHINGTON COUNTY     65664      0.0663
+#> 3  2018 IL         WILL COUNTY           24521      0.0594
+#> 4  2018 CA         SANTA CLARA COUNTY    22101      0.0605
+#> 5  2018 CA         SAN FRANCISCO COUNTY  17547      0.0301
+```
+
+Utah's Washington County is second by `excess` with 65,664 ballots and a
+`state_share` of 0.066, while the rows at the top of the first table hold between
+44% and 115% of their state's reported total on a fraction of the ballots.
+Neither ordering is wrong, but only the first answers "could this change a number
+I publish". A share above 1 means the jurisdiction's own parts sum exceeds what
+the whole state reported, which happens where the suspect total is most of the
+state: the Virgin Islands file as a single jurisdiction.
+
+## Three checks, one concept
+
+The three functions answer different questions, and none of them substitutes for
+another. Take Oregon's mail rejection rate across all five cycles:
+
+
+``` r
+or <- eavs_rate(panel, "mail_rejected", "mail_returned")
+or[or$state_abbr == "OR", c("year", "rate", "n_both", "den_share", "known_anomaly")]
+#> # A tibble: 5 × 5
+#>    year      rate n_both den_share known_anomaly
+#>   <dbl>     <dbl>  <int>     <dbl> <chr>        
+#> 1  2016 0.00857       36         1 <NA>         
+#> 2  2018 0.0000923     36         1 numerator    
+#> 3  2020 0.00732       36         1 <NA>         
+#> 4  2022 0.0145        36         1 <NA>         
+#> 5  2024 0.0168        36         1 <NA>
+```
+
+`eavs_rate()` says the 2018 rate rests on all 36 counties holding the whole
+state's returned ballots, and `known_anomaly` says not to trust it anyway.
+`eavs_flags()` supplies the reason:
+
+
+``` r
+ka <- flags[flags$kind == "known_anomaly" & flags$state_abbr == "OR", ]
+unique(ka$note)
+#> [1] "All 36 Oregon counties answer the by-mail counted item for a small subset of ballots: 7,043 statewide against 1,907,342 returned, where 2016 and 2020 both show counted within 1% of returned. The 2018 value understates Oregon's counted mail ballots by roughly 1.9M."                                                
+#> [2] "All 36 Oregon counties answer the by-mail rejected item for a small subset of ballots: 176 statewide against 1,907,342 returned, where Oregon reports 17,574 (2016) and 17,547 (2020) and its Secretary of State counted 28,322 ballots challenged statewide in 2016. Rates built on the 2018 value will read near zero."
+```
+
+And when a rate is simply absent, `eavs_missing_status()` is the only thing that
+says whether the jurisdictions were unable to answer or the item did not apply to
+them. That needs the status frame, bound across years with
+`dplyr::bind_rows()`—`rbind()` fails here, because a concept absent from a
+year's questionnaire produces no column rather than an empty one:
+
+
+``` r
+status <- dplyr::bind_rows(lapply(years, function(y) {
+  eavs_harmonize(eavs_missing_status(eavs_read(y, quiet = TRUE)), year = y)
+}))
+cov <- eavs_aggregate(panel, status = status, concepts = "mail_rejected")
+cov[cov$state_abbr == "MS", c("year", "n_reported", "n_missing", "n_not_applicable", "coverage")]
+#> # A tibble: 5 × 5
+#>    year n_reported n_missing n_not_applicable coverage
+#>   <dbl>      <int>     <int>            <int>    <dbl>
+#> 1  2016         82         0                0        1
+#> 2  2018         82         0                0        1
+#> 3  2020         82         0                0        1
+#> 4  2022          0        82                0        0
+#> 5  2024          0        82                0        0
+```
+
+Mississippi reports the item through 2020 and then stops, and the status frame
+shows those later absences as genuine gaps rather than a "does not apply". A rate
+of `NA` looks the same either way.
+
 ## A short checklist
 
 Run `eavs_flags()` on the panel, not on a subset you have already narrowed.
-Filter to your concepts, then sort within a kind. Treat known anomalies as
-disqualifying for that state-year. Check `eavs_items()` for any concept whose
-series looks discontinuous, since the `note` column usually explains it. And
-prefer rates over levels when coverage moves between cycles, because a level can
-change simply because more jurisdictions answered.
+Filter to your concepts, then sort by `state_share` within a kind. Treat known
+anomalies as disqualifying for that state-year. Check `eavs_items()` for any
+concept whose series looks discontinuous, since the `note` column usually
+explains it. And prefer rates over levels when coverage moves between cycles,
+because a level can change simply because more jurisdictions answered.

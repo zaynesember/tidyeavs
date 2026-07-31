@@ -45,6 +45,15 @@
 #' both sides of the ratio, and the column is `NA` if the panel carries no
 #' `reg_eligible_total`.
 #'
+#' @section Anomalous state-years:
+#' `known_anomaly` is `TRUE` where this year, state, and concept are recorded in
+#' [eavs_known_anomalies] and at least one jurisdiction in the group reported a
+#' value, so the total rests on the anomalous convention. Coverage cannot tell
+#' you this: Iowa's 2018 polling places are reported by all 99 counties, so every
+#' coverage column reads as complete, and the state total is still not comparable
+#' to its other cycles. The value is summed as reported either way, and what to
+#' do about it is yours; [eavs_flags()] gives the reason and the evidence.
+#'
 #' @section What is not corrected:
 #' Nothing. Values are summed as reported, and `NA` is skipped rather than
 #' imputed, so a "does not apply" never becomes a zero. Maine's statewide UOCAVA
@@ -66,11 +75,14 @@
 #' @param concepts Optional character vector limiting which concepts to roll up.
 #' @param jurisdictions The jurisdiction table to join for county codes. Defaults
 #'   to the bundled [eavs_jurisdictions].
+#' @param anomalies The verified reporting anomalies to mark. Defaults to the
+#'   bundled [eavs_known_anomalies]; pass your own or set to `NULL` to skip them.
 #'
 #' @return A tibble with one row per group per concept per year: the grouping
 #'   columns, `entity_type` (`"state"`, `"territory"`, or `"district"`, so a
 #'   50-state analysis is one filter), `concept`, `value`, the five bucket
-#'   counts, `n_total`, `coverage`, `coverage_reg`, and `coverage_exact`.
+#'   counts, `n_total`, `coverage`, `coverage_reg`, `coverage_exact`, and
+#'   `known_anomaly`.
 #' @seealso [eavs_rate()] for a rate rather than a total, [eavs_flags()] for
 #'   consistency checks, [eavs_missing_status()] for per-jurisdiction reasons.
 #' @export
@@ -86,8 +98,11 @@
 #' eavs_aggregate(panel, status = st)
 #' }
 eavs_aggregate <- function(data, status = NULL, by = "state", concepts = NULL,
-                           jurisdictions = NULL) {
+                           jurisdictions = NULL, anomalies = NULL) {
   by <- match.arg(by, c("state", "county"))
+  if (missing(anomalies)) {
+    anomalies <- eavs_known_anomalies
+  }
 
   if (!"year" %in% names(data)) {
     cli::cli_abort("{.arg data} needs a {.field year} column; use {.fn eavs_load}.")
@@ -141,6 +156,11 @@ eavs_aggregate <- function(data, status = NULL, by = "state", concepts = NULL,
   res <- dplyr::bind_rows(out)
 
   res$entity_type <- entity_type_of(res$state_abbr)
+  # A total can rest on an anomalous reporting convention while every coverage
+  # column reads as complete, so say so here rather than leaving it to a
+  # separate eavs_flags() call the user has to know to make.
+  res$known_anomaly <- anomaly_match(res$year, res$state_abbr, res$concept,
+                                     anomalies) & res$n_reported > 0
 
   key_names <- setdiff(names(keys), ".row")
   res <- res[order(res$year, res$concept), c("year", setdiff(key_names, "year"),
@@ -150,7 +170,8 @@ eavs_aggregate <- function(data, status = NULL, by = "state", concepts = NULL,
                                              "n_not_collected",
                                              "n_total", "coverage",
                                              "coverage_reg",
-                                             "coverage_exact")]
+                                             "coverage_exact",
+                                             "known_anomaly")]
   tibble::as_tibble(res)
 }
 
