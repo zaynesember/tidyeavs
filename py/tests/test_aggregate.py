@@ -223,3 +223,43 @@ def test_status_in_the_wrong_year_order_is_an_error():
     assert len(reversed_status) == len(p)  # the row count check cannot see it
     with pytest.raises(ValueError, match="not aligned"):
         tidyeavs.aggregate(p, status=reversed_status)
+
+
+# known_anomaly: a total can rest on an anomalous convention while every
+# coverage column reads as complete, which is exactly Iowa's 2018 polling places
+# (all 99 counties reporting).
+
+
+def agg_anomalies() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "year": [2024],
+            "state_abbr": ["AL"],
+            "concept": ["mail_rejected"],
+            "note": ["Test fixture."],
+            "source": ["Test fixture."],
+        }
+    )
+
+
+def test_known_anomaly_marks_totals_resting_on_an_anomalous_state_year():
+    out = tidyeavs.aggregate(panel(), anomalies=agg_anomalies())
+    hit = (out["state_abbr"] == "AL") & (out["concept"] == "mail_rejected")
+    assert out.loc[hit, "known_anomaly"].all()
+    assert not out.loc[~hit, "known_anomaly"].any()
+    # Coverage is unaffected: the column reports, it does not adjust.
+    assert out.loc[hit, "coverage"].notna().all()
+
+
+def test_known_anomaly_is_false_where_the_group_reported_nothing():
+    frame = panel()
+    frame.loc[frame["state_abbr"] == "AL", "mail_rejected"] = None
+    out = tidyeavs.aggregate(frame, anomalies=agg_anomalies())
+    hit = (out["state_abbr"] == "AL") & (out["concept"] == "mail_rejected")
+    assert (out.loc[hit, "n_reported"] == 0).all()
+    assert not out.loc[hit, "known_anomaly"].any()
+
+
+def test_anomalies_none_skips_the_lookup():
+    out = tidyeavs.aggregate(panel(), anomalies=None)
+    assert not out["known_anomaly"].any()

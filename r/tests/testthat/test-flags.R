@@ -133,9 +133,11 @@ test_that("an empty result still has the full set of columns", {
   expect_equal(
     names(f),
     c("year", "fips_code", "state_abbr", "jurisdiction_name", "check", "kind",
-      "concept", "observed", "threshold", "excess", "n_parts_reported", "note")
+      "concept", "observed", "threshold", "excess", "n_parts_reported",
+      "state_share", "note")
   )
   expect_type(f$excess, "double")
+  expect_type(f$state_share, "double")
   expect_type(f$check, "character")
 })
 
@@ -261,4 +263,57 @@ test_that("a code shared by two rows is not compared against the wrong row", {
   expect_equal(nrow(f), 1)
   expect_equal(f$jurisdiction_name, "TOWN OF VERNON")
   expect_equal(f$threshold, 100)
+})
+
+## state_share: how much of its state's total for the concept the flagged
+## jurisdiction holds, so a user can sort by what could actually move a number.
+
+test_that("state_share measures the flagged jurisdiction against its state", {
+  d <- tibble::tibble(
+    year = rep(2024L, 2),
+    fips_code = c("0100100000", "0100300000"),
+    state_abbr = c("AL", "AL"),
+    jurisdiction_name = c("AUTAUGA COUNTY", "BALDWIN COUNTY"),
+    mail_transmitted = c(1000, 1000),
+    mail_returned = c(100, 900),      # state total 1000
+    mail_counted = c(80, 100),
+    mail_rejected = c(40, 100)        # Autauga: 120 > 100, so it flags
+  )
+  f <- eavs_flags(d, checks = checks_fixture(), swing_factor = NULL)
+  expect_equal(nrow(f), 1)
+  expect_equal(f$jurisdiction_name, "AUTAUGA COUNTY")
+  # Numerator is max(observed, threshold) = 120, not the reported 100, so a
+  # suspiciously small total cannot make a large jurisdiction look immaterial.
+  expect_equal(f$state_share, 120 / 1000)
+})
+
+test_that("state_share uses the larger side, so a drop to zero is not hidden", {
+  d <- tibble::tibble(
+    year = c(2022L, 2022L, 2024L, 2024L),
+    fips_code = c("0100100000", "0100300000", "0100100000", "0100300000"),
+    state_abbr = "AL",
+    jurisdiction_name = c("AUTAUGA COUNTY", "BALDWIN COUNTY",
+                          "AUTAUGA COUNTY", "BALDWIN COUNTY"),
+    # Autauga falls 500 -> 0 while Baldwin holds steady, so the 2024 state
+    # total for the concept is Baldwin's 200 alone.
+    mail_returned = c(500, 200, 0, 200)
+  )
+  f <- eavs_flags(d, checks = NULL, swing_factor = 10, swing_floor = 100)
+  dz <- f[f$check == "dropped_to_zero", ]
+  expect_equal(nrow(dz), 1)
+  expect_equal(dz$jurisdiction_name, "AUTAUGA COUNTY")
+  # This cycle's value is zero by construction, so the prior cycle's 500 is what
+  # says the flag matters. Sorting on `observed` would bury it at zero.
+  expect_equal(dz$state_share, 500 / 200)
+  expect_true(dz$state_share > 1)
+})
+
+test_that("state_share is NA when the state reported nothing for the concept", {
+  d <- panel_1y(mail_transmitted = 100, mail_returned = 0,
+                mail_counted = 5, mail_rejected = 5)
+  f <- eavs_flags(d, checks = checks_fixture(), swing_factor = NULL)
+  expect_equal(f$check, "disposition_le_returned")
+  # The state's mail_returned total is zero, so there is nothing to be a share
+  # of; NA rather than a division by zero.
+  expect_true(is.na(f$state_share))
 })

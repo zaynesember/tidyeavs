@@ -21,7 +21,8 @@ apart, and on a multi-year panel it is not optional.
 ```{r load}
 library(tidyeavs)
 
-panel <- eavs_load(c(2016, 2018, 2020, 2022, 2024), quiet = TRUE)
+years <- c(2016, 2018, 2020, 2022, 2024)
+panel <- eavs_load(years, quiet = TRUE)
 flags <- suppressMessages(eavs_flags(panel))
 nrow(flags)
 ```
@@ -141,11 +142,77 @@ rows land in `n_not_collected` rather than `n_missing`, and coverage for that
 year is `NA` rather than zero, so "never asked" and "asked and unanswered" stay
 distinguishable. See `vignette("missingness")`.
 
+## Which flags could actually move your number
+
+Filtering to your concepts still leaves more rows than you can read, and `excess`
+does not rank them usefully across jurisdictions: it is measured in ballots, so a
+large county's small discrepancy outranks a small county's total one. Sort by
+`state_share`, which is how much of its state's total for that concept the
+flagged jurisdiction holds:
+
+```{r materiality}
+sums <- flags[flags$kind == "sum" & flags$concept == "mail_returned", ]
+head(sums[order(-sums$state_share),
+          c("year", "state_abbr", "jurisdiction_name", "excess", "state_share")], 5)
+```
+
+Compare that ordering with the one `excess` gives:
+
+```{r materiality-excess}
+head(sums[order(-sums$excess),
+          c("year", "state_abbr", "jurisdiction_name", "excess", "state_share")], 5)
+```
+
+Utah's Washington County is second by `excess` with 65,664 ballots and a
+`state_share` of 0.066, while the rows at the top of the first table hold between
+44% and 115% of their state's reported total on a fraction of the ballots.
+Neither ordering is wrong, but only the first answers "could this change a number
+I publish". A share above 1 means the jurisdiction's own parts sum exceeds what
+the whole state reported, which happens where the suspect total is most of the
+state: the Virgin Islands file as a single jurisdiction.
+
+## Three checks, one concept
+
+The three functions answer different questions, and none of them substitutes for
+another. Take Oregon's mail rejection rate across all five cycles:
+
+```{r three-checks}
+or <- eavs_rate(panel, "mail_rejected", "mail_returned")
+or[or$state_abbr == "OR", c("year", "rate", "n_both", "den_share", "known_anomaly")]
+```
+
+`eavs_rate()` says the 2018 rate rests on all 36 counties holding the whole
+state's returned ballots, and `known_anomaly` says not to trust it anyway.
+`eavs_flags()` supplies the reason:
+
+```{r three-checks-flags}
+ka <- flags[flags$kind == "known_anomaly" & flags$state_abbr == "OR", ]
+unique(ka$note)
+```
+
+And when a rate is simply absent, `eavs_missing_status()` is the only thing that
+says whether the jurisdictions were unable to answer or the item did not apply to
+them. That needs the status frame, bound across years with
+`dplyr::bind_rows()`—`rbind()` fails here, because a concept absent from a
+year's questionnaire produces no column rather than an empty one:
+
+```{r three-checks-status}
+status <- dplyr::bind_rows(lapply(years, function(y) {
+  eavs_harmonize(eavs_missing_status(eavs_read(y, quiet = TRUE)), year = y)
+}))
+cov <- eavs_aggregate(panel, status = status, concepts = "mail_rejected")
+cov[cov$state_abbr == "MS", c("year", "n_reported", "n_missing", "n_not_applicable", "coverage")]
+```
+
+Mississippi reports the item through 2020 and then stops, and the status frame
+shows those later absences as genuine gaps rather than a "does not apply". A rate
+of `NA` looks the same either way.
+
 ## A short checklist
 
 Run `eavs_flags()` on the panel, not on a subset you have already narrowed.
-Filter to your concepts, then sort within a kind. Treat known anomalies as
-disqualifying for that state-year. Check `eavs_items()` for any concept whose
-series looks discontinuous, since the `note` column usually explains it. And
-prefer rates over levels when coverage moves between cycles, because a level can
-change simply because more jurisdictions answered.
+Filter to your concepts, then sort by `state_share` within a kind. Treat known
+anomalies as disqualifying for that state-year. Check `eavs_items()` for any
+concept whose series looks discontinuous, since the `note` column usually
+explains it. And prefer rates over levels when coverage moves between cycles,
+because a level can change simply because more jurisdictions answered.

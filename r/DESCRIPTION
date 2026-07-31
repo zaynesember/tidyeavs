@@ -1,6 +1,6 @@
 Package: tidyeavs
 Title: Tidy Access to Election Administration and Voting Survey Data
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R:
     person("Zayne", "Sember", , "zaynesember@gmail.com", role = c("aut", "cre"))
 Description: A consistent interface to the U.S. Election Assistance

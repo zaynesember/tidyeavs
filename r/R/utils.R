@@ -67,6 +67,25 @@ entity_type_of <- function(state_abbr) {
          ifelse(state_abbr == "DC", "district", "state"))
 }
 
+# Is this year/state/concept one of the verified reporting anomalies? Keyed the
+# same three ways `flag_known_anomalies()` matches, since every anomaly recorded
+# so far is a statewide convention for one concept in one cycle. Vectorized over
+# all three arguments; `concept` is usually a single name recycled.
+#
+# This is what lets eavs_rate() and eavs_aggregate() say that a number rests on
+# an anomalous state-year, which no arithmetic check can tell you: Oregon's 2018
+# mail rejection rate comes back with n_both = 36 and den_share = 1, i.e. every
+# county reporting, and is still unusable. Reporting it is as far as this goes.
+# The value is returned as summed, and what to do about it is the user's call.
+anomaly_match <- function(year, state_abbr, concept, anomalies) {
+  n <- max(length(year), length(state_abbr), length(concept))
+  if (is.null(anomalies) || nrow(anomalies) == 0) {
+    return(rep(FALSE, n))
+  }
+  paste(year, state_abbr, concept) %in%
+    paste(anomalies$year, anomalies$state_abbr, anomalies$concept)
+}
+
 # The 2016 EAVS writes sentinels as "CODE: Label" (e.g.
 # "-999999: Data Not Available"). Reduce such a value to its numeric code so
 # the shared sentinel logic can handle it. Plain values pass through unchanged.

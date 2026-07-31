@@ -77,3 +77,50 @@ test_that("county rollups drop codes with no county, as in eavs_aggregate", {
   expect_true("county_fips" %in% names(out))
   expect_equal(nrow(out), 3)
 })
+
+## The known_anomaly column. Oregon 2018 is the case it exists for: every county
+## reports, so n_both and den_share both read as perfect support, and the rate is
+## still built on a convention that makes it unusable.
+
+rate_anomalies <- function() {
+  tibble::tibble(
+    year = 2024,
+    state_abbr = "AL",
+    concept = "mail_rejected",
+    note = "Test fixture.",
+    source = "Test fixture."
+  )
+}
+
+test_that("known_anomaly names which side of the ratio is affected", {
+  out <- eavs_rate(rate_panel(), "mail_rejected", "mail_returned",
+                   anomalies = rate_anomalies())
+  expect_equal(out$known_anomaly[out$state_abbr == "AL"], "numerator")
+  expect_true(is.na(out$known_anomaly[out$state_abbr == "ME"]))
+
+  # The same concept as denominator is reported as the denominator side.
+  flip <- eavs_rate(rate_panel(), "mail_returned", "mail_rejected",
+                    anomalies = rate_anomalies())
+  expect_equal(flip$known_anomaly[flip$state_abbr == "AL"], "denominator")
+})
+
+test_that("known_anomaly is 'both' when the anomaly covers each side", {
+  an <- rate_anomalies()
+  an <- rbind(an, transform(an, concept = "mail_returned"))
+  out <- eavs_rate(rate_panel(), "mail_rejected", "mail_returned", anomalies = an)
+  expect_equal(out$known_anomaly[out$state_abbr == "AL"], "both")
+})
+
+test_that("known_anomaly stays NA when no common subset carries the anomaly", {
+  # With no jurisdiction reporting both sides there is no rate to distrust.
+  p <- rate_panel()
+  p$mail_returned <- c(NA, NA, 50, 50)
+  out <- eavs_rate(p, "mail_rejected", "mail_returned", anomalies = rate_anomalies())
+  expect_equal(out$n_both[out$state_abbr == "AL"], 0L)
+  expect_true(is.na(out$known_anomaly[out$state_abbr == "AL"]))
+})
+
+test_that("anomalies = NULL skips the lookup", {
+  out <- eavs_rate(rate_panel(), "mail_rejected", "mail_returned", anomalies = NULL)
+  expect_true(all(is.na(out$known_anomaly)))
+})

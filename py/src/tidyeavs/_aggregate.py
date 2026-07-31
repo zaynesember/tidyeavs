@@ -8,12 +8,17 @@ same trap ``_dictionary`` avoids.
 from __future__ import annotations
 
 import warnings
-from typing import Iterable
+from typing import Any, Iterable
 
+import numpy as np
 import pandas as pd
 
 from . import _metadata
 from ._constants import TERRITORIES
+
+# None means "skip the anomaly column", so a distinct sentinel is needed for
+# "use the shipped table". Same pattern as _flags.py.
+_DEFAULT = object()
 
 _ID_COLUMNS = (
     "year",
@@ -38,6 +43,7 @@ def aggregate(
     by: str = "state",
     concepts: Iterable[str] | None = None,
     jurisdictions: pd.DataFrame | None = None,
+    anomalies: Any = _DEFAULT,
 ) -> pd.DataFrame:
     """Sum a harmonized panel to one row per group per concept.
 
@@ -83,6 +89,16 @@ def aggregate(
     Every row also carries ``entity_type`` (``"state"``, ``"territory"``, or
     ``"district"``), so a 50-state analysis is one filter.
 
+    **Anomalous state-years.** ``known_anomaly`` is ``True`` where this year,
+    state, and concept are recorded in :func:`tidyeavs.known_anomalies` and at
+    least one jurisdiction in the group reported a value, so the total rests on
+    the anomalous convention. Coverage cannot tell you this: Iowa's 2018 polling
+    places are reported by all 99 counties, so every coverage column reads as
+    complete, and the state total is still not comparable to its other cycles.
+    The value is summed as reported either way; :func:`tidyeavs.flags` gives the
+    reason and the evidence. Pass ``anomalies=None`` to skip the column's
+    lookup.
+
     **Nothing is corrected.** Values are summed as reported, and ``NA`` is
     skipped rather than imputed, so a "does not apply" never becomes a zero.
     Maine's statewide UOCAVA row and the territories are included, because both
@@ -99,6 +115,8 @@ def aggregate(
         raise ValueError(f"by must be 'state' or 'county'; got {by!r}")
     if "year" not in data.columns:
         raise ValueError("data needs a 'year' column; use tidyeavs.load().")
+    if anomalies is _DEFAULT:
+        anomalies = _metadata.known_anomalies()
     if status is not None:
         if len(status) != len(data):
             raise ValueError(
@@ -138,6 +156,12 @@ def aggregate(
     ]
     out = pd.concat(frames, ignore_index=True)
     out["entity_type"] = _entity_type(out["state_abbr"])
+    # A total can rest on an anomalous reporting convention while every coverage
+    # column reads as complete, so say so here rather than leaving it to a
+    # separate flags() call the user has to know to make.
+    out["known_anomaly"] = _anomaly_match(
+        out["year"], out["state_abbr"], out["concept"], anomalies
+    ) & (out["n_reported"] > 0).to_numpy()
 
     lead = ["year"] + [c for c in keys.columns if c != "year"]
     out = out[
@@ -155,6 +179,7 @@ def aggregate(
             "coverage",
             "coverage_reg",
             "coverage_exact",
+            "known_anomaly",
         ]
     ]
     return out.sort_values(["year", "concept"] + [c for c in lead if c != "year"],
@@ -187,6 +212,42 @@ def _entity_type(state_abbr: pd.Series) -> pd.Series:
     out[state_abbr.isin(TERRITORIES)] = "territory"
     out[state_abbr == "DC"] = "district"
     return out
+
+
+def _anomaly_match(year, state_abbr, concept, anomalies) -> np.ndarray:
+    """Is this year/state/concept one of the verified reporting anomalies?
+
+    Keyed the same three ways ``_flag_known_anomalies`` matches, since every
+    anomaly recorded so far is a statewide convention for one concept in one
+    cycle. ``concept`` may be a single name, recycled. Mirrors
+    ``anomaly_match()`` in ``utils.R``.
+
+    This is what lets :func:`rate` and :func:`aggregate` say that a number rests
+    on an anomalous state-year, which no arithmetic check can tell you: Oregon's
+    2018 mail rejection rate comes back with every county reporting and is still
+    unusable. Reporting it is as far as this goes—the value is returned as
+    summed, and what to do about it is the user's call.
+    """
+    years = list(pd.to_numeric(pd.Series(list(year)), errors="coerce").astype("Int64"))
+    states = list(state_abbr)
+    n = len(years)
+    concepts = [concept] * n if isinstance(concept, str) else list(concept)
+
+    if anomalies is None or len(anomalies) == 0:
+        return np.zeros(n, dtype=bool)
+
+    known = {
+        f"{a_year} {a_state} {a_concept}"
+        for a_year, a_state, a_concept in zip(
+            pd.to_numeric(anomalies["year"], errors="coerce").astype("Int64"),
+            anomalies["state_abbr"],
+            anomalies["concept"],
+        )
+    }
+    return np.array(
+        [f"{y} {s} {c}" in known for y, s, c in zip(years, states, concepts)],
+        dtype=bool,
+    )
 
 
 def _group_keys(

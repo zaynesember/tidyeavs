@@ -8,8 +8,10 @@ eavs_items(query = NULL, year = NULL, section = NULL, dictionary = NULL)
 }
 \arguments{
 \item{query}{A string matched (case-insensitively) against concept names,
-labels, raw codes, and EPI names. \code{NULL} (default) returns everything,
-subject to \code{year} and \code{section}.}
+labels, raw codes, and EPI names. An exact concept name wins outright, so
+\code{"mail_rejected"} returns that concept rather than it plus the sixteen
+\verb{mail_rejected_*} reasons; search \code{"mail_rejected_"} for the family.
+\code{NULL} (default) returns everything, subject to \code{year} and \code{section}.}
 
 \item{year}{Restrict to one or more survey years.}
 

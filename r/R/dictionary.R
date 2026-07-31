@@ -6,8 +6,10 @@
 #' item.
 #'
 #' @param query A string matched (case-insensitively) against concept names,
-#'   labels, raw codes, and EPI names. `NULL` (default) returns everything,
-#'   subject to `year` and `section`.
+#'   labels, raw codes, and EPI names. An exact concept name wins outright, so
+#'   `"mail_rejected"` returns that concept rather than it plus the sixteen
+#'   `mail_rejected_*` reasons; search `"mail_rejected_"` for the family.
+#'   `NULL` (default) returns everything, subject to `year` and `section`.
 #' @param year Restrict to one or more survey years.
 #' @param section Restrict to one or more survey sections (`"A"` through `"F"`,
 #'   or `"id"` for identifier columns).
@@ -36,6 +38,14 @@ eavs_items <- function(query = NULL, year = NULL, section = NULL,
     dict <- dict[tolower(dict$section) %in% tolower(section), , drop = FALSE]
   }
   if (!is.null(query)) {
+    # An exact concept name wins outright. Several concepts are prefixes of
+    # others—mail_rejected against the sixteen mail_rejected_* reasons,
+    # prov_rejected against nine—so a substring search alone would answer
+    # "what is the code for mail rejections" with seventeen concepts.
+    exact <- which(tolower(dict$concept) == tolower(query))
+    if (length(exact) > 0) {
+      return(tibble::as_tibble(dict[exact, , drop = FALSE]))
+    }
     hay <- tolower(paste(
       dict$concept, dict$concept_label, dict$codebook_label,
       dict$code, dict$epi_name

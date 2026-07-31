@@ -66,12 +66,15 @@ years stack, and the result is an ordinary tibble.
 
 The tempting way to get a state's mail rejection rate—sum `mail_rejected`,
 sum `mail_returned`, divide—is wrong more often than you'd expect, because
-whole states report one side and not the other. All 67 Alabama counties report
-returned ballots and none report rejections, so the naive division hands you a
-clean-looking 0.0%; in 2022 Idaho it gives 0.0008% where the defensible figure
-is 0.21%. `eavs_rate()` computes the rate the way the EAC's published rates
-are computed—over the jurisdictions that reported both sides—and says what
-that restriction kept:
+whole states report one side and not the other. In 2020 all 67 Alabama counties
+report returned ballots and none report rejections, so the naive division hands
+you a clean-looking 0.0%. In 2024 Alabama reports rejections and no returns, so
+the same code gives `Inf`. Which side a state leaves out changes from cycle to
+cycle, and only one of those two mistakes is loud enough to notice. In 2022
+Idaho the naive figure is 0.0008% where the defensible one is 0.21%.
+`eavs_rate()` computes the rate the way the EAC's published rates are
+computed, over the jurisdictions that reported both sides, and says what that
+restriction kept:
 
 ```r
 eavs_rate(panel, "mail_rejected", "mail_returned")
@@ -79,8 +82,15 @@ eavs_rate(panel, "mail_rejected", "mail_returned")
 
 Read `n_both` (how many jurisdictions stand behind the rate) and `den_share`
 (how much of the state's reported denominator they hold) before quoting a
-number; Alabama comes back as `rate = NA` with `n_num_only = 67` instead of a
-fake zero.
+number. Alabama comes back as `rate = NA` rather than a fake zero, with
+`n_den_only = 67` in 2020 and `n_num_only = 67` in 2024, naming which side went
+unreported.
+
+A rate can pass both of those checks and still be one you should not quote.
+Oregon's 2018 mail rejection rate has all 36 counties reporting and
+`den_share = 1`, and is unusable anyway, because every county answered the
+disposition items for a small subset of ballots that year. `known_anomaly` marks
+the rows where a verified statewide reporting anomaly like that one is in play.
 
 Totals have the same exposure in milder form: a jurisdiction that didn't
 report an item is simply absent from a sum, so a state total silently covers
@@ -91,9 +101,35 @@ that don't reconcile, hard year-over-year swings, and the verified statewide
 reporting anomalies that pass every arithmetic check (Oregon's 2018 mail
 disposition numbers are the standing example).
 
+It returns a lot of rows, 16,249 over all five cycles, and most of them are
+ordinary reporting differences rather than anything you need to act on. Filter to
+your concepts, then sort by `state_share` within one `kind`. That column is how
+much of its state's total for that concept the flagged jurisdiction holds, which
+is the thing to know when you are deciding whether a flag could move a number you
+plan to publish. Sorting by `excess` instead ranks a large county's small
+discrepancy above a small county's complete one.
+
+Running all three checks is worth the trouble, because each one sees something
+the others cannot. `eavs_rate()` reports whether enough jurisdictions reported
+both sides of a ratio. `eavs_flags()` reports whether what they did report
+reconciles. `eavs_missing_status()` is the only one that says why the absent
+jurisdictions are absent. The `comparing-across-years` vignette works through all
+three on one concept.
+
 ## Vignettes
 
-Four, and the first one covers the task above in more depth:
+Four, and the first one covers the task above in more depth. They are the
+conceptual documentation, so they are worth reading before the help pages.
+
+Note that `pak` and `remotes` do not build vignettes by default, so
+`vignette("getting-started")` will report that it does not exist after an install
+like the one above. They render with their output on GitHub, at
+<https://github.com/zaynesember/tidyeavs/tree/main/r/vignettes>, or you can ask
+for them at install time:
+
+```r
+remotes::install_github("zaynesember/tidyeavs", subdir = "r", build_vignettes = TRUE)
+```
 
 ```r
 vignette("getting-started", package = "tidyeavs")        # a mail rejection rate, end to end
@@ -116,6 +152,29 @@ raw <- eavs_read(2024)
 eavs_missing_status(raw)   # each item value replaced by why it is (not) missing
 ```
 
+One caution on reading those reasons. `does_not_apply` is not a stable signal
+for a concept across cycles, so it will not carry the weight of an imputation.
+Alabama's `mail_rejected` is coded `does_not_apply` for all 67 counties in 2016,
+reported in 2018, `not_available` in 2020 and 2022, and reported again in 2024.
+For a concept that reflects a yes-or-no state policy, "does not apply" plausibly
+does mean zero; for a continuous administrative outcome like a rejection count it
+usually does not, and the same code means different things in different cycles.
+Whether to treat it as a zero is a judgment to make per concept, and to state in
+your methods; the package will not make it for you.
+
+For a cross-year status frame, bind with `dplyr::bind_rows()` rather than
+`rbind()`. The years have different column counts, because a concept that was not
+on that year's questionnaire produces no column at all rather than an all-`NA`
+one, and `rbind()` fails on that with an opaque message:
+
+```r
+years <- c(2016, 2018, 2020, 2022, 2024)
+status <- dplyr::bind_rows(lapply(years, function(y) {
+  eavs_harmonize(eavs_missing_status(eavs_read(y, quiet = TRUE)), year = y)
+}))
+eavs_aggregate(panel, status = status)   # reason-aware coverage
+```
+
 ## Finding variables
 
 The dictionary maps every year's raw codes to stable concept names, and
@@ -125,12 +184,41 @@ of a codebook—what is `C9a`, and is it `C9a` in every year?
 ```r
 eavs_items("C9a")            # -> C9a is mail_rejected (in 2022 and 2024)
 eavs_items("mail_rejected")  # the code for mail rejections in every year
+eavs_items("mail_rejected_") # the sixteen rejection-reason concepts
 eavs_items(section = "C")    # all mail-ballot concepts
+eavs_items("total registered")  # -> reg_eligible_total, the survey's own total
 ```
+
+An exact concept name wins over a substring, so `eavs_items("mail_rejected")`
+gives you that concept rather than it plus every `mail_rejected_*` reason.
 
 Because the mapping is explicit, the renumbering traps become visible instead of
 silent: `eavs_items("uocava_rejected")` shows that the code is `B24a` in 2024
-but `B18a` in 2020—and that `B18a` in 2024 is a different item entirely.
+but `B18a` in 2020—and that `B18a` in 2024 is a different item entirely. The
+rejection-reason blocks are the worst of these. Between 2020 and 2022 the mail
+reasons moved from `C4` to `C9`, and the letters were reshuffled along the way:
+only `b` through `e` kept theirs, so "No Address" runs `C4j` then `C9l`, while
+`C9j` is "Envelope Not Sealed". The provisional reasons moved from `E2` to `E3`,
+and `E2` was reused for why a provisional was *cast*, so `E2e` reads "No ID" in
+2020 and "Not Resident of Precinct" in 2024. Both columns are populated in both
+cycles, so a series built by carrying the old code forward looks fine and is
+wrong. Both blocks are crosswalked now, which is the reason to prefer the
+crosswalk over tracking a code yourself.
+
+Two things to know about the reasons. They are a curated subset, since the survey
+also offers Other 1 through 3 (and, in 2018 and 2020, a missing election-official
+signature), so they are expected to sum to less than `mail_rejected` and
+`eavs_flags()` only checks that they do not exceed it. And 2016 collects no mail
+rejection reasons at all, so those columns are absent from any panel that
+includes it.
+
+One more caution about looking for a concept. The survey's total registration
+figure is `reg_eligible_total` (`A1a`, "Total Registered Voters", the same code in
+all five years), and it is a question the survey asks rather than a sum you build
+yourself. Adding `reg_active` and `reg_inactive` gets you a worse version of it,
+because seven states and four territories report the active count and never the
+inactive one. That is the same reporting asymmetry `eavs_rate()` exists to handle,
+and it applies to a derived *sum* just as much as to a ratio.
 
 ## The pieces
 
@@ -151,12 +239,31 @@ steps add typing and structure on top of that faithful copy.
 
 EAVS jurisdictions are not a tidy geography: Wisconsin reports ~1,850
 municipalities under non-geographic serial codes, Maine files a statewide row
-carrying only its UOCAVA totals, Alaska and the territories file one row each,
+carrying only its UOCAVA totals (military and overseas voters, after the
+Uniformed and Overseas Citizens Absentee Voting Act), Alaska and the
+territories file one row each,
 and a handful of published codes are shared, padded, or otherwise irregular.
 The bundled `eavs_jurisdictions` table lists every published row per year with
 its type (county, municipality, statewide, territory), the county FIPS where
 the published code embeds one, and a flag or note for each quirk—so you can
 see them before they bite an aggregate or a join.
+
+**Warning:** `fips_code` is not a unique key within a year, so please check for
+duplicates before joining on it. Three Wisconsin town/village pairs share one
+published code (`82575` and `84275` in 2020, `31550` in 2022), and a join fans
+those rows out. Summing `partic_total` for Wisconsin in 2020 after a plain
+`merge(panel, eavs_jurisdictions, by = c("year", "fips_code"))` gives 3,319,954
+against a true 3,308,331, a 0.35% overstatement produced by four duplicated rows.
+Base `merge()` gives no warning, and neither does pandas;
+`dplyr::left_join()` is the only one of the three that says anything. The
+`shared_code` column flags the affected rows, and `fips10` is unique wherever it
+is not `NA`.
+
+Joining the other way has the opposite problem. Maine's UOCAVA totals live in a
+statewide row that carries no county FIPS, so a county-keyed join silently drops
+all 6,309 of its 2024 counted UOCAVA ballots. `eavs_aggregate()` and
+`eavs_rate()` handle both cases correctly. The exposure is in joins you write
+yourself.
 
 ## Where the data lives
 

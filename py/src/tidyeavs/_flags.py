@@ -27,6 +27,7 @@ _COLUMNS = (
     "threshold",
     "excess",
     "n_parts_reported",
+    "state_share",
     "note",
 )
 
@@ -79,6 +80,26 @@ def flags(
     ``excess``, and ``n_parts_reported`` are missing: there is no comparison,
     only a documented reason to read the value with the ``note`` in hand.
 
+    ``state_share`` is roughly how much of its state's total for that concept the
+    flagged jurisdiction holds, and it is the column to sort by when the question
+    is whether a flag could move a number you plan to publish. A discrepancy in a
+    jurisdiction holding 0.2% of the state's mail ballots cannot; one holding 40%
+    can. ``excess`` will not tell you this, because it is measured on the
+    concept's own scale: a large county's small discrepancy outranks a small
+    county's complete one.
+
+    The numerator is the larger of ``observed`` and ``threshold``, since the
+    smaller one is often the reason the flag fired. Utah's Washington County
+    reports 943 mail ballots returned in 2022 against 65,664 counted, so taking
+    the reported total would call it 0.09% of the state when the county cast 6.5%
+    of Utah's ballots. The share can therefore run above 1. That happens on a sum
+    check where the suspect total is most of what the state reported (the Virgin
+    Islands file as a single jurisdiction), and on a swing where the larger number
+    belongs to the previous cycle while the denominator belongs to this one.
+
+    ``state_share`` measures size, not severity. What a flag means for your
+    analysis is still yours to decide.
+
     Pass ``checks=None`` to skip sum checks, ``swing_factor=None`` to skip
     swings, or ``anomalies=None`` to skip known anomalies. ``swing_floor``
     keeps small counts out, so a jump from 1 to 20 does not dominate.
@@ -106,7 +127,7 @@ def flags(
             {
                 name: pd.Series(
                     dtype="float64"
-                    if name in ("observed", "threshold", "excess")
+                    if name in ("observed", "threshold", "excess", "state_share")
                     else "Int64"
                     if name in ("year", "n_parts_reported")
                     else "object"
@@ -115,10 +136,52 @@ def flags(
             }
         )
 
-    out = pd.concat(pieces, ignore_index=True)[list(_COLUMNS)]
+    out = pd.concat(pieces, ignore_index=True)
+    out["state_share"] = _state_share(data, out)
+    out = out[list(_COLUMNS)]
     return out.sort_values(
         ["kind", "excess"], ascending=[True, False], kind="mergesort"
     ).reset_index(drop=True)
+
+
+def _state_share(data: pd.DataFrame, res: pd.DataFrame) -> np.ndarray:
+    """How big is this jurisdiction, in this concept, within its state-year?
+
+    A flag on a jurisdiction holding 0.1% of the state's mail ballots cannot move
+    a state number; one holding 40% can, and nothing else in the output
+    distinguishes them: ``excess`` is on the concept's own scale, so it ranks a
+    large county's small discrepancy above a small county's total one.
+
+    The numerator is the larger of the two numbers already on the row, because the
+    smaller one is often the reason the flag fired and would hide a large
+    jurisdiction. Utah's Washington County reports 943 mail ballots returned in
+    2022 against 65,664 counted: taking the reported total would call it 0.09% of
+    the state when the county cast 6.5% of Utah's ballots. A dropped_to_zero flag
+    is the same problem in the other direction, its current value being zero by
+    construction. Grouping on year + state_abbr rather than fips_code keeps the
+    Wisconsin serials shared by a town/village pair out of it. Mirrors
+    ``flag_state_share()`` in ``flags.R``.
+    """
+    share = np.full(len(res), np.nan)
+    if "state_abbr" not in data.columns:
+        return share
+
+    own = np.fmax(
+        pd.to_numeric(res["observed"], errors="coerce").to_numpy(dtype="float64"),
+        pd.to_numeric(res["threshold"], errors="coerce").to_numpy(dtype="float64"),
+    )
+    group = data["year"].astype(str) + " " + data["state_abbr"].astype(str)
+    res_group = (res["year"].astype(str) + " " + res["state_abbr"].astype(str)).to_numpy()
+
+    for concept in res["concept"].dropna().unique():
+        if concept not in data.columns:
+            continue
+        totals = pd.to_numeric(data[concept], errors="coerce").groupby(group).sum()
+        hit = (res["concept"] == concept).to_numpy()
+        denom = totals.reindex(res_group[hit]).to_numpy(dtype="float64")
+        with np.errstate(invalid="ignore", divide="ignore"):
+            share[hit] = np.where(denom > 0, own[hit] / denom, np.nan)
+    return share
 
 
 def _ids(data: pd.DataFrame, keep: np.ndarray) -> pd.DataFrame:
