@@ -27,6 +27,7 @@ from __future__ import annotations
 from ._aggregate import aggregate
 from ._dictionary import items
 from ._flags import flags
+from ._join import join
 from ._metadata import (
     checks,
     dictionary,
@@ -59,6 +60,7 @@ __all__ = [
     "aggregate",
     "rate",
     "flags",
+    "join",
     "items",
     # shared metadata
     "dictionary",

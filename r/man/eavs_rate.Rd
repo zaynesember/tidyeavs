@@ -68,6 +68,12 @@ prints exactly like one resting on 96\%. \code{n_num_only} and \code{n_den_only}
 the jurisdictions that reported only one side, so Alabama above appears as
 \code{n_num_only = 67} rather than as an inflated rate.
 
+\code{den_share} is a concentration diagnostic, not a usability filter. To drop
+rates that rest on no common subset at all, test \code{n_both > 0} (equivalently
+\code{!is.na(rate)}): with an empty subset \code{den_share} reads \code{0} where some
+jurisdiction reported the denominator and \code{NA} where none did, so neither
+test alone catches both.
+
 To pool groups, sum \code{num_value} and \code{den_value}; averaging \code{rate} would
 weight a small county like a large one. The same call gives the EAC's
 voting-mode shares, e.g.

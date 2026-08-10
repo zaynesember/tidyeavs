@@ -48,7 +48,7 @@ relocating any loose files already listed.
 ## Current state
 
 `R CMD check` passes clean (0 errors / 0 warnings / 0 notes) at version 0.1.0.
-Python: 136 tests pass, of which 26 need a populated cache (integration +
+Python: 146 tests pass, of which 26 need a populated cache (integration +
 published-totals). Both verified end to
 end against the published record (row counts per year, mail-rejection rates
 ~0.8–1.5%, UOCAVA rejection, drop boxes appearing only 2022+).
@@ -74,7 +74,7 @@ Exported API (two tiers):
   jurisdiction-year panel.
 - Steps: `eavs_download()`, `eavs_read()`, `eavs_recode_missing()`,
   `eavs_missing_status()`, `eavs_harmonize()`, `eavs_aggregate()`,
-  `eavs_rate()`, `eavs_flags()`, `eavs_items()`.
+  `eavs_rate()`, `eavs_flags()`, `eavs_join()`, `eavs_items()`.
 - Cache: `eavs_cache_dir()`, `eavs_cache_list()`, `eavs_cache_clear()`.
 
 Shipped datasets: `eavs_manifest` (file catalog), `eavs_dictionary` (the
@@ -139,6 +139,9 @@ reasons behind it).
   with reason-aware coverage counts.
 - `flags.R`—`eavs_flags()`; internal-consistency checks and year-over-year
   swings. Reports, never mutates.
+- `join.R`—`eavs_join()`; a safe left join that stops on a shared code rather
+  than fanning rows out, and reports the rows a county-keyed join would drop.
+  See below.
 - `data.R`—dataset roxygen docs. `globals.R`, `utils.R`—helpers.
 
 `eavs_harmonize()` and `eavs_items()` take an optional `dictionary=` argument
@@ -147,13 +150,14 @@ the shipped data.
 
 `py/src/tidyeavs/` mirrors that file-for-file, deliberately: `cache.py`,
 `download.py`, `read.py`, `recode.py`, `_dictionary.py`, `harmonize.py`,
-`load.py`, `_aggregate.py`, `_flags.py`, plus `_constants.py` (the
+`load.py`, `_aggregate.py`, `_flags.py`, `_join.py`, plus `_constants.py` (the
 sentinel/token/id-pattern tables that are
 `utils.R` in R) and `_metadata.py` (loads `metadata/`; the R equivalent is the
 build-time `data-raw/` step, since R bakes the datasets into the package).
 Public names drop the `eavs_` prefix—`tidyeavs.load()`, `.read()`,
-`.harmonize()`, `.aggregate()`, `.flags()`, `.items()`—because Python
-namespaces by module and R does not.
+`.harmonize()`, `.aggregate()`, `.flags()`, `.join()`, `.items()`—because Python
+namespaces by module and R does not. (`_join.py`, not `join.py`, for the same
+shadowing reason as `_dictionary.py`.)
 Returns pandas.
 
 Keep the two in step. When a sentinel, token, or identifier pattern changes it
@@ -371,6 +375,42 @@ County 2024 has `mail_counted` exactly equal to `mail_returned` with 4,724
 rejected on top, i.e. it treats returned as returned-and-accepted; Utah's Davis
 County drops `partic_by_mail` 117,826 → 0, almost certainly a shift into
 `partic_all_mail`.
+
+## `eavs_join` / `tidyeavs.join` (done 2026-08-08)
+
+The Tier 1 finding of the user test, and the one item from it left unbuilt in
+0.1.0: `fips_code` is not a unique key within a year, so a join on it goes wrong
+two ways and both were silent. `eavs_join(x, y = eavs_jurisdictions, by, ...)`
+is a checked left join that surfaces each rather than resolving it—corrections-
+free, like the rest of the package.
+
+- **Fan-out.** Three Wisconsin town/village pairs share one serial (`82575`,
+  `84275` in 2020; `31550` in 2022), so a key duplicated in `y` multiplies `x`'s
+  matching rows and inflates any later sum (WI 2020 `partic_total` 3,319,954 vs
+  a true 3,308,331, +0.35%). Default `multiple = "error"` aborts, names the
+  shared codes, and—when both frames carry `jurisdiction_name` and it is not
+  already a key—tells the user to add it to `by`, which matches the pairs
+  exactly since town and village differ only in name. `multiple = "all"` keeps
+  the expansion.
+- **Silent drop.** Maine's UOCAVA totals sit in a statewide row with no county
+  FIPS, so a county-keyed join loses them. `unmatched` (`"inform"` default,
+  then `"warn"`/`"error"`/`"ignore"`) reports how many `x` rows matched nothing;
+  they are kept with `NA`, never dropped.
+- **Only new columns are added.** Overlapping non-key columns are taken from
+  `x`, so `eavs_join(panel)` attaches `fips10`, `county_fips`, `type`, and the
+  quirk flags without a `.x`/`.y` (R) or `_x`/`_y` (Python) pair on the
+  identifiers the panel already carries.
+
+The R helper reuses dplyr's `relationship` guard as defense-in-depth, which is
+why `DESCRIPTION` now floors `dplyr (>= 1.1.0)`. In Python `join()` maps R's
+`inform` and `warn` both to `warnings.warn`, since Python has no message/warning
+split; the output frame is identical either way. Verified R vs Python on the
+2020+2022 churn span: **12,920 × 77, 0 differing cells** (only R's
+`NA`/`TRUE`/`FALSE` CSV tokens vs Python's, which is serialization, not data).
+
+A helper protects only the user who reaches for it; `pd.merge`/`merge()` reached
+for by habit still fan out silently, so both READMEs point at `eavs_join()` /
+`tidyeavs.join()` right where the hazard is described.
 
 ## Published-totals tests (done 2026-07-30)
 
