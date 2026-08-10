@@ -27,6 +27,12 @@
 #' the jurisdictions that reported only one side, so Alabama above appears as
 #' `n_num_only = 67` rather than as an inflated rate.
 #'
+#' `den_share` is a concentration diagnostic, not a usability filter. To drop
+#' rates that rest on no common subset at all, test `n_both > 0` (equivalently
+#' `!is.na(rate)`): with an empty subset `den_share` reads `0` where some
+#' jurisdiction reported the denominator and `NA` where none did, so neither
+#' test alone catches both.
+#'
 #' To pool groups, sum `num_value` and `den_value`; averaging `rate` would
 #' weight a small county like a large one. The same call gives the EAC's
 #' voting-mode shares, e.g.

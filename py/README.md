@@ -248,7 +248,17 @@ missing. The `shared_code` column flags the affected rows.
 Merging the other way has the opposite problem. Maine's UOCAVA totals live in a
 statewide row that carries no county FIPS, so a county-keyed merge silently drops
 all 6,309 of its 2024 counted UOCAVA ballots. `aggregate()` and `rate()` handle
-both cases correctly. The exposure is in merges you write yourself.
+both cases correctly, and `join()` is the safe way to write the merge yourself:
+
+```python
+# Attach county FIPS, structural type, and quirk flags to a panel.
+# Stops on the Wisconsin fan-out; add the name to match the pairs exactly.
+tidyeavs.join(panel, by=["year", "fips_code", "jurisdiction_name"])
+```
+
+It stops on a shared code rather than fanning the rows out, and reports the rows
+a county-keyed merge would drop instead of losing them. `pandas.merge` does
+neither on its own.
 
 ## Where the data lives
 

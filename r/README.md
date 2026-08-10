@@ -262,8 +262,18 @@ is not `NA`.
 Joining the other way has the opposite problem. Maine's UOCAVA totals live in a
 statewide row that carries no county FIPS, so a county-keyed join silently drops
 all 6,309 of its 2024 counted UOCAVA ballots. `eavs_aggregate()` and
-`eavs_rate()` handle both cases correctly. The exposure is in joins you write
-yourself.
+`eavs_rate()` handle both cases correctly, and `eavs_join()` is the safe way to
+write the join yourself:
+
+```r
+# Attach county FIPS, structural type, and quirk flags to a panel.
+# Stops on the Wisconsin fan-out; add the name to match the pairs exactly.
+eavs_join(panel, by = c("year", "fips_code", "jurisdiction_name"))
+```
+
+It stops on a shared code rather than fanning the rows out, and reports the rows
+a county-keyed join would drop instead of losing them. Base `merge()` and pandas
+do neither on their own.
 
 ## Where the data lives
 
