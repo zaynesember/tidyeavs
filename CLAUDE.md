@@ -47,7 +47,7 @@ relocating any loose files already listed.
 
 ## Current state
 
-`R CMD check` passes clean (0 errors / 0 warnings / 0 notes) at version 0.1.0.
+`R CMD check` passes clean (0 errors / 0 warnings / 0 notes) at version 0.2.0.
 Python: 146 tests pass, of which 26 need a populated cache (integration +
 published-totals). Both verified end to
 end against the published record (row counts per year, mail-rejection rates
@@ -521,7 +521,7 @@ Re-diffed R against Python after all of the above, over three spans including
 the churn span 2020+2022: panels (12,927 × 63 / 12,920 × 68 / 12,921 × 68),
 flags, rate, and aggregate all **0 differing cells** except `note`, whose only
 substitution across all three spans is `eavs_` → `` (the `eavs_missing_status()`
-vs `missing_status()` reference). Version is now **0.1.0** in both
+vs `missing_status()` reference). Version was set to **0.1.0** (bumped to **0.2.0** on 2026-09-18 for `eavs_join()`, with `r/NEWS.md` added) in both
 `r/DESCRIPTION` and `py/pyproject.toml`, and `r/inst/CITATION` cites the package
 and the EAC data and tells the reader to record `RemoteSha` and the manifest
 version.
